@@ -234,8 +234,24 @@ class Process(object):
         finally:
             # The run of the next pending request if finished here, weather or not it successfull
             self.launch_next_process()
+            self.cleanup_old_process()
 
         return wps_response
+
+    def cleanup_old_process(self):
+        stored_request = dblog.get_old_finished_request()
+        workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
+
+        for r in stored_request:
+            tempdir_path = os.path.join(workdir, 'pywps_process_' + str(uuid))
+            if os.path.exists(tempdir_path):
+                LOGGER.info("Removing temporary working directory: %s" % tempdir_path)
+                try:
+                    if os.path.isdir(tempdir_path):
+                        shutil.rmtree(tempdir_path)
+                except Exception as err:
+                    LOGGER.error('Unable to remove directory: %s', err)
+
 
     def launch_next_process(self):
         """Look at the queue of async process, if the queue is not empty launch the next pending request.

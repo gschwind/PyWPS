@@ -91,8 +91,13 @@ class Service(object):
         process = copy.deepcopy(process)
         process.service = self
         workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
-        tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
-        process.set_workdir(tempdir)
+        tempdir_path = os.path.join(workdir, 'pywps_process_'+str(uuid))
+        # tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
+        try:
+            os.mkdir(tempdir_path)
+        except FileExistsError as e:
+            pass
+        process.set_workdir(tempdir_path)
         return process
 
     def _parse_and_execute(self, process, wps_request, uuid):

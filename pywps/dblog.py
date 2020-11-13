@@ -17,11 +17,15 @@ import pickle
 import json
 import os
 
+from pywps.response.status import WPS_STATUS
+
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, VARCHAR, Float, DateTime, LargeBinary
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+
+import sqlalchemy.or_ as OR
 
 LOGGER = logging.getLogger('PYWPS')
 _SESSION_MAKER = None
@@ -86,6 +90,18 @@ def get_running():
     running = session.query(ProcessInstance).filter(
         ProcessInstance.percent_done < 100).filter(
             ProcessInstance.percent_done > -1)
+
+    session.close()
+    return running
+
+def get_old_finished_request():
+    """Returns running processes ids
+    """
+
+    session = get_session()
+    running = session.query(ProcessInstance).filter(
+        ProcessInstance.status.in_([WPS_STATUS.FAILED, WPS_STATUS.SUCCEEDED])).filter(
+            ProcessInstance.time_end < (datetime.datetime.now()-datetime.timedelta(1.0)))
 
     session.close()
     return running
@@ -206,3 +222,5 @@ def remove_stored(uuid):
     session.delete(request)
     session.commit()
     session.close()
+
+

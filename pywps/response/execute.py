@@ -76,8 +76,8 @@ class ExecuteResponse(WPSResponse):
                 f.flush()
                 os.fsync(f.fileno())
 
-            if (self.status == WPS_STATUS.SUCCEEDED or self.status == WPS_STATUS.FAILED) and clean:
-                self.process.clean()
+            # if (self.status == WPS_STATUS.SUCCEEDED or self.status == WPS_STATUS.FAILED) and clean:
+            #     self.process.clean()
 
         except Exception as e:
             raise NoApplicableCode('Writing Response Document failed with : %s' % e)

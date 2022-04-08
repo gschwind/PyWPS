@@ -14,8 +14,6 @@ from copy import deepcopy
 from pywps.validator.mode import MODE
 from pywps.inout.literaltypes import AnyValue, NoValue, ValuesReference, AllowedValue
 
-CDATA_PATTERN = re.compile(r'<!\[CDATA\[(.*?)\]\]>')
-
 
 class BoundingBoxInput(basic.BBoxInput):
 
@@ -223,11 +221,6 @@ class ComplexInput(basic.ComplexInput):
             if data_format.encoding == 'base64':
                 instance.data = base64.b64decode(data)
             else:
-                # remove cdata tag if it exists (issue #553)
-                if isinstance(data, str):
-                    match = CDATA_PATTERN.match(data)
-                    if match:
-                        data = match.group(1)
                 instance.data = data
 
         return instance
@@ -250,11 +243,9 @@ class ComplexInput(basic.ComplexInput):
                 else:
                     # Otherwise we assume all other formats are unsafe and need to be enclosed in a CDATA tag.
                     if isinstance(self.data, bytes):
-                        out = self.data.decode(self.data_format.encoding or 'utf-8')
+                        data["data"] = self.data.decode(self.data_format.encoding or 'utf-8')
                     else:
-                        out = self.data
-
-                    data["data"] = '<![CDATA[{}]]>'.format(out)
+                        data["data"] = self.data
 
         return data
 

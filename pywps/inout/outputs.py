@@ -227,41 +227,16 @@ class ComplexOutput(basic.ComplexOutput):
                 if self.data_format.encoding == 'base64':
                     data["data"] = self.base64.decode('utf-8')
                 else:
-                    # Match only data that are safe CDATA pattern.
-                    CDATA_PATTERN = re.compile(r'^<!\[CDATA\[((?!\]\]>).)*\]\]>$')
-
-                    # Otherwise we assume all other formats are unsafe and need to be enclosed in a CDATA tag.
                     if isinstance(self.data, bytes):
-                        # Try to inline data as text but if fail encode is in base64
                         if self.data_format.encoding == 'utf-8':
                             out = self.data.decode('utf-8')
-                            # If data is already enclosed with CDATA pattern, do not add it twice
-                            if CDATA_PATTERN.match(out):
-                                data["data"] = out
-                            else:
-                                # Check if the data does not contain ]]> patern if is safe to use CDATA
-                                # other wise we fallback to base64 encoding.
-                                if not re.search('\\]\\]>', out):
-                                    data["data"] = '<![CDATA[{}]]>'.format(out)
-                                else:
-                                    data['encoding'] = 'base64'  # override the unsafe encoding
-                                    data["data"] = self.base64.decode('utf-8')
+                            data["data"] = escape_for_xml(out)
                         else:
                             data['encoding'] = 'base64'  # override the unsafe encoding
                             data["data"] = self.base64.decode('utf-8')
                     else:
                         out = str(self.data)
-                        # If data is already enclose with CDATApatern do not add it twise
-                        if CDATA_PATTERN.match(out):
-                            data["data"] = out
-                        else:
-                            # Check if the data does not contain ]]> patern if is safe to use CDATA
-                            # other wise we fallback to base64 encoding.
-                            if not re.search('\\]\\]>', out):
-                                data["data"] = '<![CDATA[{}]]>'.format(out)
-                            else:
-                                data['encoding'] = 'base64'  # override the unsafe encoding
-                                data["data"] = self.base64.decode('utf-8')
+                        data["data"] = escape_for_xml(out)
 
         return data
 
@@ -554,3 +529,17 @@ def output_from_json(json_data):
         raise InvalidParameterValue("Output type not recognized: {}".format(data_type))
 
     return output
+
+
+def escape_for_xml(s):
+    s = re.sub("&", "&amp;", s)
+    s = re.sub(">", "&gt;", s)
+    s = re.sub("<", "&lt;", s)
+    return s
+
+
+def unescape_from_xml(s):
+    s = re.sub("&lt;", "<", s)
+    s = re.sub("&gt;", ">", s)
+    s = re.sub("&amp;", "&", s)
+    return s

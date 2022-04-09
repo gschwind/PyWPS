@@ -7,6 +7,9 @@ import json
 import logging
 import time
 from werkzeug.wrappers import Request
+
+from pywps.app import Process
+from pywps.app.WPSRequest import WPSRequest
 from pywps import get_ElementMakerForVersion
 from pywps.app.basic import get_response_type, get_json_indent, get_default_response_mimetype
 from pywps.exceptions import NoApplicableCode
@@ -29,17 +32,17 @@ WPS, OWS = get_ElementMakerForVersion("1.0.0")
 
 class ExecuteResponse(WPSResponse):
 
-    def __init__(self, wps_request, uuid, **kwargs):
+    def __init__(self, wps_request: WPSRequest, uuid: str, process: Process):
         """constructor
 
         :param pywps.app.WPSRequest.WPSRequest wps_request:
-        :param pywps.app.Process.Process process:
+        :param pywps.app.Process process:
         :param uuid: string this request uuid
         """
 
         super(ExecuteResponse, self).__init__(wps_request, uuid)
 
-        self.process = kwargs["process"]
+        self.process = process
         self.outputs = {o.identifier: o for o in self.process.outputs}
         self.store_status_file = False
 

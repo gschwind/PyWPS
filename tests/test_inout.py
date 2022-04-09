@@ -264,7 +264,12 @@ class SerializationComplexInputTest(unittest.TestCase):
         with open(some_file, "w") as f:
             f.write("some data")
         complex.file = some_file
+
+        # Check that complex can be serialized to string
+        json.dumps(complex.json)
+
         complex2 = inout.inputs.ComplexInput.from_json(complex.json)
+
         self.assert_complex_equals(complex, complex2)
         self.assertEqual(complex.prop, 'file')
         self.assertEqual(complex2.prop, 'file')
@@ -274,6 +279,10 @@ class SerializationComplexInputTest(unittest.TestCase):
     def test_complex_input_data(self):
         complex = self.make_complex_input()
         complex.data = "some data"
+
+        # Check that complex can be serialized to string
+        json.dumps(complex.json)
+
         # the data is enclosed by a CDATA tag in json
         assert complex.json['data'] == 'some data'
         # dump to json and load it again
@@ -287,6 +296,10 @@ class SerializationComplexInputTest(unittest.TestCase):
     def test_complex_input_stream(self):
         complex = self.make_complex_input()
         complex.stream = StringIO("{'name': 'test', 'input1': ']]'}")
+
+        # Check that complex can be serialized to string
+        json.dumps(complex.json)
+
         # the data is enclosed by a CDATA tag in json
         assert complex.json['data'] == "{'name': 'test', 'input1': ']]'}"
         # dump to json and load it again
@@ -300,6 +313,10 @@ class SerializationComplexInputTest(unittest.TestCase):
     def test_complex_input_url(self):
         complex = self.make_complex_input()
         complex.url = "http://test.opendap.org:80/opendap/netcdf/examples/sresa1b_ncar_ccsm3_0_run1_200001.nc"
+
+        # Check that complex can be serialized to string
+        json.dumps(complex.json)
+
         complex2 = inout.inputs.ComplexInput.from_json(complex.json)
         self.assert_complex_equals(complex, complex2)
         self.assertEqual(complex.prop, 'url')
@@ -354,6 +371,10 @@ class SerializationLiteralInputTest(unittest.TestCase):
 
     def test_literal_input(self):
         literal = self.make_literal_input()
+
+        # Check that complex can be serialized to string
+        json.dumps(literal.json)
+
         literal2 = inout.inputs.LiteralInput.from_json(literal.json)
         self.assert_literal_equals(literal, literal2)
 
@@ -401,6 +422,10 @@ class SerializationBoundingBoxInputTest(unittest.TestCase):
 
     def test_bbox_input(self):
         bbox = self.make_bbox_input()
+
+        # Check that complex can be serialized to string
+        json.dumps(bbox.json)
+
         bbox2 = inout.inputs.BoundingBoxInput.from_json(bbox.json)
         self.assert_bbox_equals(bbox, bbox2)
 
@@ -595,6 +620,9 @@ class LiteralInputTest(unittest.TestCase):
         self.literal_input.data = 9
         out = self.literal_input.json
 
+        # Check that literals input can be serialized to string
+        json.dumps(out)
+
         self.assertEqual(out['uoms'][0]["uom"], "metre")
         self.assertEqual(out['uoms'][1]["uom"], "km / h")
         self.assertEqual(out['uoms'][1]["reference"], "custom reference")
@@ -624,6 +652,10 @@ class LiteralInputTest(unittest.TestCase):
             data_type='dateTime')
         inpt.data = "2017-04-20T12:30:00"
         out = inpt.json
+
+        # Check that literals input can be serialized to string
+        json.dumps(out)
+
         self.assertEqual(out['data'], '2017-04-20 12:30:00', 'datetime set')
 
     def test_json_out_time(self):
@@ -634,6 +666,10 @@ class LiteralInputTest(unittest.TestCase):
             data_type='time')
         inpt.data = "12:30:00"
         out = inpt.json
+
+        # Check that literals input can be serialized to string
+        json.dumps(out)
+
         self.assertEqual(out['data'], '12:30:00', 'time set')
 
     def test_json_out_date(self):
@@ -644,6 +680,10 @@ class LiteralInputTest(unittest.TestCase):
             data_type='date')
         inpt.data = "2017-04-20"
         out = inpt.json
+
+        # Check that literals input can be serialized to string
+        json.dumps(out)
+
         self.assertEqual(out['data'], '2017-04-20', 'date set')
 
     def test_translations(self):

@@ -8,7 +8,7 @@ from pywps.response.status import WPS_STATUS
 from pywps.translations import get_translation
 from jinja2 import Environment, PackageLoader
 import os
-from pywps.xml_util import escape_for_xml
+from pywps.xml_util import escape_for_xml, cleanup_xml_string_for_xml
 
 
 class RelEnvironment(Environment):
@@ -48,7 +48,8 @@ class WPSResponse(object):
             trim_blocks=True, lstrip_blocks=True,
             autoescape=True,
         )
-        self.template_env.globals.update(get_translation=get_translation, escape_for_xml=escape_for_xml)
+        self.template_env.globals.update(get_translation=get_translation, escape_for_xml=escape_for_xml,
+                                         cleanup_xml_string_for_xml=cleanup_xml_string_for_xml)
 
     def _update_status(self, status, message, status_percentage):
         """

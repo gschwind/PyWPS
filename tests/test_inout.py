@@ -319,7 +319,7 @@ class SerializationComplexInputTest(unittest.TestCase):
         complex.method = "GET"
         complex.max_size = 1000
         complex.data = b"some data"
-        # the data is enclosed by a CDATA tag in json
+        # The json data for base64 data_format are base64 string
         assert complex.json['data'] == 'c29tZSBkYXRh'
         # dump to json and load it again
         complex2 = inout.inputs.ComplexInput.from_json(complex.json)

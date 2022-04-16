@@ -18,6 +18,7 @@ from pywps.inout.types import Translations
 from pywps.validator.mode import MODE
 from pywps import configuration as config
 from pywps.inout.formats import Format, Supported_Formats, FORMATS
+from pywps.xml_util import escape_for_xml
 
 
 class BoundingBoxOutput(basic.BBoxOutput):

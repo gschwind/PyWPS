@@ -217,27 +217,13 @@ class ComplexOutput(basic.ComplexOutput):
         data["type"] = "complex"
 
         if self.data:
-            if self.data_format.mime_type in [FORMATS.GEOJSON.mime_type, FORMATS.JSON.mime_type]:
-                data["data"] = self.data
-            elif self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
-                # Note that in a client-server round trip, the original and returned file will not be identical.
-                data_doc = etree.parse(self.file)
-                data["data"] = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
-
+            if self.data_format.encoding == 'base64':
+                data["data"] = self.base64.decode('utf-8')
             else:
-                if self.data_format.encoding == 'base64':
-                    data["data"] = self.base64.decode('utf-8')
+                if isinstance(self.data, bytes):
+                    data["data"] = self.data.decode(self.data_format.encoding or 'utf-8')
                 else:
-                    if isinstance(self.data, bytes):
-                        if self.data_format.encoding == 'utf-8':
-                            out = self.data.decode('utf-8')
-                            data["data"] = escape_for_xml(out)
-                        else:
-                            data['encoding'] = 'base64'  # override the unsafe encoding
-                            data["data"] = self.base64.decode('utf-8')
-                    else:
-                        out = str(self.data)
-                        data["data"] = escape_for_xml(out)
+                    data["data"] = self.data
 
         return data
 

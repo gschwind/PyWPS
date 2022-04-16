@@ -529,17 +529,3 @@ def output_from_json(json_data):
         raise InvalidParameterValue("Output type not recognized: {}".format(data_type))
 
     return output
-
-
-def escape_for_xml(s):
-    s = re.sub("&", "&amp;", s)
-    s = re.sub(">", "&gt;", s)
-    s = re.sub("<", "&lt;", s)
-    return s
-
-
-def unescape_from_xml(s):
-    s = re.sub("&lt;", "<", s)
-    s = re.sub("&gt;", ">", s)
-    s = re.sub("&amp;", "&", s)
-    return s

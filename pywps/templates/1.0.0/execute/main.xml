@@ -86,9 +86,15 @@
             {% if output.type == "reference" %}
             <wps:Reference href="{{ output.href }}" mimeType="{{ output.mimetype }}" encoding="{{ output.encoding }}" schema="{{ output.schema }}"/>
             {% elif output.type == "complex" %}
-			<wps:Data>
-                    <wps:ComplexData mimeType="{{ output.mimetype }}" encoding="{{ output.encoding }}" schema="{{ output.schema }}">{{ escape_for_xml(output.data) | safe }}</wps:ComplexData>
-			</wps:Data>
+                {%if (output.mimetype in ["application/xml", "application/gml+xml", "text/xml"]) and (output.encoding != "base64") %}
+                <wps:Data>
+                        <wps:ComplexData mimeType="{{ output.mimetype }}" encoding="{{ output.encoding }}" schema="{{ output.schema }}">{{ cleanup_xml_string_for_xml(output.data, output.encoding) | safe }}</wps:ComplexData>
+                </wps:Data>
+                {% else %}
+                <wps:Data>
+                        <wps:ComplexData mimeType="{{ output.mimetype }}" encoding="{{ output.encoding }}" schema="{{ output.schema }}">{{ escape_for_xml(output.data) | safe }}</wps:ComplexData>
+                </wps:Data>
+                {% endif %}
             {% elif output.type == "literal" %}
 			<wps:Data>
                 <wps:LiteralData {% if output.uom %}uom="{{ output.uom.reference }}"{% endif %} dataType="{{ output.data_type }}">{{ output.data }}</wps:LiteralData>

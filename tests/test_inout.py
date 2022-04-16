@@ -295,9 +295,10 @@ class SerializationComplexInputTest(unittest.TestCase):
 
     def test_complex_input_binary_data(self):
         complex = self.make_complex_input()
+        # Using binary data as input of not base64 data_format will decode the bytes array with
+        # data_format.encoding or utf-8
         complex.data = b"some data"
-        # the data is enclosed by a CDATA tag in json
-        assert complex.json['data'] == '<![CDATA[some data]]>'
+        assert complex.json['data'] == 'some data'
         self.assertEqual(complex.prop, 'data')
 
     def test_complex_input_data_with_binary_data_format(self):

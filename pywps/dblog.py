@@ -8,6 +8,8 @@ Implementation of logging for PyWPS-4
 """
 
 import logging
+import sys
+
 from pywps import configuration
 from pywps.exceptions import NoApplicableCode
 import sqlite3
@@ -22,6 +24,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, VARCHAR, Float, DateTime, LargeBinary
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
+
 
 LOGGER = logging.getLogger('PYWPS')
 _SESSION_MAKER = None
@@ -138,6 +141,42 @@ def update_pid(uuid, pid):
         request = requests.one()
         request.pid = pid
         session.commit()
+    session.close()
+
+
+def cleanup_crashed_process():
+    # TODO: implement other platform
+    if sys.platform != "linux":
+        return
+
+    session = get_session()
+    stored_query = session.query(RequestInstance.uuid)
+    running_cur = (
+        session.query(ProcessInstance)
+        .filter(ProcessInstance.percent_done < 100)
+        .filter(ProcessInstance.percent_done > -1)
+        .filter(~ProcessInstance.uuid.in_(stored_query))
+    )
+
+    failed = []
+    running = [(p.uuid, p.pid) for p in running_cur]
+    for uuid, pid in running:
+        # No process with this pid, the process has crashed
+        if not os.path.exists(os.path.join("/proc", str(pid))):
+            failed.append(uuid)
+            continue
+
+        # If we can't read the environ, that mean the process belong another user
+        # which mean that this is not our process, thus our process has crashed
+        # this not work because root is the user for the apache
+        # if not os.access(os.path.join("/proc", str(pid), "environ"), os.R_OK):
+        #     failed.append(uuid)
+        #     continue
+
+    for uuid in failed:
+        # Using WPS_STATUS.FAILED does not work because of recursive import
+        store_status(uuid, 5, "Process crashed", 100)
+
     session.close()
 
 

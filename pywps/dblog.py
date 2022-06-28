@@ -56,6 +56,13 @@ class RequestInstance(Base):
     request = Column(LargeBinary, nullable=False)
 
 
+class StatusInstance(Base):
+    __tablename__ = '{}stored_status'.format(_tableprefix)
+
+    uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
+    data = Column(LargeBinary, nullable=False)
+
+
 def log_request(uuid, request):
     """Write OGC WPS request (only the necessary parts) to database logging
     system
@@ -196,3 +203,34 @@ def store_process(uuid, request):
     session.add(request)
     session.commit()
     session.close()
+
+
+def store_status_data(uuid, execute_response_json):
+    """Save status data of given request for later usage
+    """
+
+    json_bytes = json.dumps(execute_response_json).encode('utf-8')
+
+    session = get_session()
+
+    query = session.query(StatusInstance).filter_by(uuid=str(uuid))
+    if query.count():
+        status = query.one()
+        status.data = json_bytes
+    else:
+        status = StatusInstance(uuid=str(uuid), data=json_bytes)
+        session.add(status)
+
+    session.commit()
+    session.close()
+
+
+def get_status_data(uuid):
+    """Gets the stored status for the given uuid or None
+    """
+    session = get_session()
+    requests = session.query(StatusInstance).filter_by(uuid=str(uuid))
+    if requests.count() <= 0:
+        return None
+    status = requests.one()
+    return json.loads(status.data.decode("utf-8"))

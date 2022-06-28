@@ -18,6 +18,7 @@ from pywps.response.status import WPS_STATUS
 from pywps.response import WPSResponse
 from pywps.inout.formats import FORMATS
 from pywps.inout.outputs import ComplexOutput
+from pywps.dblog import store_status_data
 
 import urllib.parse as urlparse
 from urllib.parse import urlencode
@@ -216,6 +217,7 @@ class ExecuteResponse(WPSResponse):
                                                                 request=self.wps_request,
                                                                 http_request=self.wps_request.http_request)
         doc = self.json
+        store_status_data(self.uuid, doc)
         try:
             json_response, mimetype = get_response_type(
                 self.wps_request.http_request.accept_mimetypes, self.wps_request.default_mimetype)

@@ -15,9 +15,12 @@ import pywps.configuration as config
 from pywps.exceptions import MissingParameterValue, NoApplicableCode, InvalidParameterValue, FileSizeExceeded, \
     StorageNotSupported, FileURLNotSupported
 from pywps.inout.inputs import ComplexInput, LiteralInput, BoundingBoxInput
-from pywps.dblog import log_request, store_status
+from pywps.dblog import log_request, store_status, get_status_data
 from pywps import response
 from pywps.response.status import WPS_STATUS
+
+from jinja2 import Environment, PackageLoader
+from pywps.translations import get_translation
 
 from collections import deque, OrderedDict
 import os
@@ -25,6 +28,12 @@ import sys
 import uuid
 import copy
 import shutil
+
+
+class RelEnvironment(Environment):
+    """Override join_path() to enable relative template paths."""
+    def join_path(self, template, parent):
+        return os.path.dirname(parent) + '/' + template
 
 
 LOGGER = logging.getLogger("PYWPS")
@@ -276,6 +285,27 @@ class Service(object):
             #
             # Exeception from CapabilityResponse and DescribeResponse are always catched by this try ... except close
             # because they never have status.
+
+            args = { k.lower(): v for k, v in http_request.args.items() }
+            service = args.get('service', None)
+            if service == "status" and http_request.method == "GET":
+                status_uuid = args.get('uuid', None)
+                if status_uuid is None:
+                    NoApplicableCode("Invalid status request", code=500)
+                data = get_status_data(status_uuid)
+                if data is None:
+                    NoApplicableCode("Invalid uuid for status request", code=500)
+                template_env = RelEnvironment(
+                    loader=PackageLoader('pywps', 'templates'),
+                    trim_blocks=True, lstrip_blocks=True,
+                    autoescape=True,
+                )
+                template_env.globals.update(get_translation=get_translation)
+                template = template_env.get_template('1.0.0/execute/main.xml')
+                doc = template.render(**data)
+                return Response(doc,mimetype="application/xml",
+                                headers={'Content-Disposition': 'attachment; filename="{}"'
+                                         .format(str(status_uuid)+".xml")})
 
             request_uuid = uuid.uuid1()
 

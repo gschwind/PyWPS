@@ -180,7 +180,8 @@ class Process(object):
 
     @property
     def status_url(self):
-        return self.status_store.url(self.status_filename)
+        baseurl = config.get_config_value('server', 'url')
+        return baseurl + '?service=status&uuid='+str(self.uuid)
 
     def _execute_process(self, async_, wps_request, wps_response):
         """Uses :module:`pywps.processing` module for sending process to

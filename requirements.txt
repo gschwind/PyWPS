@@ -10,3 +10,4 @@ MarkupSafe
 humanize
 geotiff
 fiona
+filelock

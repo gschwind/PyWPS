@@ -18,6 +18,7 @@ import pickle
 import json
 import os
 from multiprocessing import Lock
+from filelock import FileLock
 
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
@@ -34,7 +35,8 @@ _schema = configuration.get_config_value('logging', 'schema')
 
 Base = declarative_base()
 
-lock = Lock()
+# Use custom lock scheme for the database because there is no unified database lock mechanism
+_db_lock = None
 
 
 class ProcessInstance(Base):
@@ -150,6 +152,7 @@ def cleanup_crashed_process():
         return
 
     session = get_session()
+
     stored_query = session.query(RequestInstance.uuid)
     running_cur = (
         session.query(ProcessInstance)
@@ -195,6 +198,17 @@ def _get_identifier(request):
         return None
 
 
+def get_lock():
+    global _db_lock
+    if _db_lock is None:
+        filelock_name = configuration.get_config_value('logging', 'database_filelock')
+        if filelock_name == 'none':
+            _db_lock = Lock()
+        else:
+            _db_lock = FileLock(filelock_name)
+    return _db_lock
+
+
 def get_session():
     """Get Connection for database
     """
@@ -204,7 +218,7 @@ def get_session():
     if _SESSION_MAKER:
         return _SESSION_MAKER()
 
-    with lock:
+    with get_lock():
         database = configuration.get_config_value('logging', 'database')
         echo = configuration.get_config_value('logging', 'database_echo') == 'true'
         try:

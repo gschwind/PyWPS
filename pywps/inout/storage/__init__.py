@@ -45,8 +45,6 @@ def get_store_instance(uuid):
     global _storage_type_registry
     store_instance_record = pywps.dblog.get_store_instance(uuid)
     if store_instance_record:
-        print(store_instance_record)
-        print(_storage_type_registry)
         return _storage_type_registry[store_instance_record.type](
             uuid=store_instance_record.uuid,
             pettry_filename=store_instance_record.pretty_filename,
@@ -139,6 +137,10 @@ class DatabaseStorageByteHandler(io.BytesIO):
         self._ds.store(self.getvalue())
         super(DatabaseStorageByteHandler, self).close()
 
+    def __exit__(self, *args, **kwargs):
+        self._ds.store(self.getvalue())
+        super(DatabaseStorageByteHandler, self).__exit__(*args, **kwargs)
+
 
 class DatabaseStorageStringHandler(io.StringIO):
     def __init__(self, ds, encoding, initial_value=""):
@@ -155,6 +157,9 @@ class DatabaseStorageStringHandler(io.StringIO):
         self._ds.store(self.getvalue().encode(self._encoding))
         super(DatabaseStorageStringHandler, self).close()
 
+    def __exit__(self, *args, **kwargs):
+        self._ds.store(self.getvalue().encode(self._encoding))
+        super(DatabaseStorageStringHandler, self).__exit__(*args, **kwargs)
 
 @register_storage_type
 class DatabaseStorage(StorageAbstract):
@@ -162,6 +167,7 @@ class DatabaseStorage(StorageAbstract):
     """
 
     def __init__(self, **kwargs):
+        self._data = b''
         super().__init__(**kwargs)
 
     def open(self, mode, encoding=None):
@@ -178,7 +184,6 @@ class DatabaseStorage(StorageAbstract):
 
     def store(self, bytes):
         self._data = bytes
-
         pywps.dblog.update_store_instance(self)
 
     @property

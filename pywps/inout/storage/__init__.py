@@ -7,6 +7,8 @@ import io
 import logging
 import os
 import uuid
+
+import pywps.configuration
 import pywps.dblog
 
 LOGGER = logging.getLogger('PYWPS')
@@ -88,6 +90,7 @@ class StorageAbstract(object):
         self._mimetype = mimetype
 
         pywps.dblog.update_store_instance(self)
+        return self.url
 
     def unexport(self):
         self.export(None, None)
@@ -103,6 +106,13 @@ class StorageAbstract(object):
     @property
     def mimetype(self):
         return self._mimetype
+
+
+    @property
+    def url(self):
+        """Build and return the exported url"""
+        base_url = pywps.configuration.get_config_value('server', 'url')
+        return f"{base_url}?service=files&uuid={self.uuid}"
 
     # Used to permanently store the file
     @property

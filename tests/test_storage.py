@@ -4,51 +4,56 @@
 ##################################################################
 import pytest
 
-from pywps.inout.storage.builder import StorageBuilder
-from pywps.inout.storage.file import FileStorage
-from pywps.inout.storage.s3 import S3Storage
-
+# Needed to create database in memory
 from pywps import configuration
-
-from pathlib import Path
-import unittest
-import tempfile
-
-
-@pytest.fixture
-def fake_output(tmp_path):
-    class FakeOutput(object):
-        """Fake output object for testing."""
-        def __init__(self):
-            self.identifier = "fake_output"
-            self.file = self._get_file()
-            self.uuid = None
-
-        def _get_file(self):
-            fn = tmp_path / 'file.tiff'
-            fn.touch()
-            return str(fn.absolute())
-
-    return FakeOutput()
+from pywps.inout.storage import new_storage, get_store_instance
+from pywps.inout.storage import DatabaseStorage
 
 
 class TestStorageBuilder():
 
     def test_default_storage(self):
-        storage = StorageBuilder.buildStorage()
-        assert isinstance(storage, FileStorage)
+        storage = new_storage()
+        assert isinstance(storage, DatabaseStorage)
 
-    def test_s3_storage(self):
-        configuration.CONFIG.set('server', 'storagetype', 's3')
-        storage = StorageBuilder.buildStorage()
-        assert isinstance(storage, S3Storage)
+    def test_store_database_storage_binary(self):
+        storage = new_storage("DatabaseStorage")
 
-    def test_recursive_directory_creation(self, fake_output):
-        """Test that outputpath is created."""
-        configuration.CONFIG.set('server', 'storagetype', 'file')
-        outputpath = Path(tempfile.gettempdir()) / "a" / "b" / "c"
-        configuration.CONFIG.set('server', 'outputpath', str(outputpath))
-        storage = StorageBuilder.buildStorage()
+        # Write some data
+        with storage.open("w") as f:
+            f.write(b'somedata')
 
-        storage.store(fake_output)
-        assert outputpath.exists()
+        # Read data from storage
+        with storage.open("r") as f:
+            data = f.read()
+            assert data == b'somedata'
+
+        # Retreive data from database
+        xstorage = get_store_instance(storage.uuid)
+        assert isinstance(xstorage, DatabaseStorage)
+
+        # Read data from storage
+        with xstorage.open("r") as f:
+            data = f.read()
+            assert data == b'somedata'
+
+    def test_store_database_storage_string(self):
+        storage = new_storage("DatabaseStorage")
+
+        # Write some data
+        with storage.open("w", "utf-8") as f:
+            f.write('somedata')
+
+        # Read data from storage
+        with storage.open("r", "utf-8") as f:
+            data = f.read()
+            assert data == 'somedata'
+
+        # Retreive data from database
+        xstorage = get_store_instance(storage.uuid)
+        assert isinstance(xstorage, DatabaseStorage)
+
+        # Read data from storage
+        with xstorage.open("r", "utf-8") as f:
+            data = f.read()
+            assert data == 'somedata'

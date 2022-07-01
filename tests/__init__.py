@@ -29,8 +29,6 @@ from tests import test_processing
 from tests import test_assync
 from tests import test_grass_location
 from tests import test_storage
-from tests import test_filestorage
-from tests import test_s3storage
 from tests.validator import test_complexvalidators
 from tests.validator import test_literalvalidators
 

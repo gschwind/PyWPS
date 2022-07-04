@@ -18,6 +18,7 @@ import pywps.configuration as config
 
 from pywps.inout.inputs import ComplexInput, LiteralInput, BoundingBoxInput
 from pywps.dblog import log_request, store_status
+from pywps.inout.storage import get_storage_instance
 from pywps.response.status import WPS_STATUS
 from pywps.response.execute import ExecuteResponse
 from pywps.response.describe import DescribeResponse
@@ -416,6 +417,21 @@ class Service(object):
             #
             # Exeception from CapabilityResponse and DescribeResponse are always catched by this try ... except close
             # because they never have status.
+
+            args = {k.lower(): v for k, v in http_request.args.items()}
+            service = args.get("service")
+            if service == "files" and http_request.method == "GET":
+                file_uuid = args.get('uuid', None)
+                if file_uuid is None:
+                    raise NoApplicableCode("Invalid uuid for files request", code=500)
+                store = get_storage_instance(file_uuid)
+                if store is None:
+                    raise NoApplicableCode("Invalid uuid for files request", code=500)
+                if store.mimetype is None:
+                    raise NoApplicableCode("Invalid uuid for files request", code=500)
+                return Response(store.open("r"),
+                                mimetype=store.mimetype,
+                                headers={'Content-Disposition': f'attachment; filename="{store.pretty_filename}"'})
 
             environ_cfg = http_request.environ.get('PYWPS_CFG')
             if 'PYWPS_CFG' not in os.environ and environ_cfg:

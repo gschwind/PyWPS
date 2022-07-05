@@ -11,6 +11,9 @@ import datetime
 import logging
 import os
 import sys
+import json
+
+from types import SimpleNamespace
 from multiprocessing import Lock
 
 import sqlalchemy
@@ -59,6 +62,17 @@ class RequestInstance(Base):
 
     uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
     request = Column(LargeBinary, nullable=False)
+
+
+class StatusRecord(Base):
+    __tablename__ = '{}status_records'.format(_tableprefix)
+
+    # Process uuid
+    uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
+    # Time stamp for creation time
+    timestamp = Column(DateTime(), nullable=False)
+    # json data used in template
+    data = Column(LargeBinary, nullable=False)
 
 
 def log_request(uuid, request):
@@ -131,6 +145,42 @@ def store_status(uuid, wps_status, message=None, status_percentage=None):
         request.status = wps_status
         session.commit()
     session.close()
+
+
+# Update or create a store instance
+def update_status_record(uuid, data):
+    session = get_session()
+    r = session.query(StatusRecord).filter_by(uuid=str(uuid))
+    if r.count():
+        status_record = r.one()
+        status_record.timestamp = datetime.datetime.now()
+        status_record.data = json.dumps(data).encode("utf-8")
+    else:
+        status_record = StatusRecord(
+            uuid=str(uuid),
+            timestamp=datetime.datetime.now(),
+            data=json.dumps(data).encode("utf-8")
+        )
+        session.add(status_record)
+    session.commit()
+    session.close()
+
+
+# Get store instance data from uuid
+def get_status_record(uuid):
+    session = get_session()
+    r = session.query(StatusRecord).filter_by(uuid=str(uuid))
+    if r.count():
+        status_record = r.one()
+        # Ensure new item to avoid change in database
+        # FIXME: There is a better solution ?
+        attrs = ["uuid", "timestamp", "data"]
+        status_record = SimpleNamespace(**{k: getattr(status_record, k) for k in attrs})
+        status_record.data = json.loads(status_record.data.decode("utf-8"))
+        session.close()
+        return status_record
+    session.close()
+    return None
 
 
 def update_pid(uuid, pid):

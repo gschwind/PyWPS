@@ -206,7 +206,7 @@ class ComplexOutput(basic.ComplexOutput):
             data["href"] = self.url
         elif self.prop is not None:
             self.storage = new_storage()
-            data["href"] = self.ensure_storage()
+            data["href"] = self.export()
 
         return data
 

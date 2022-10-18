@@ -555,7 +555,7 @@ class ComplexOutputTest(unittest.TestCase):
                       'typename=continents&maxfeatures=2'
         self.complex_out.url = wfsResource
         self.complex_out.storage = DatabaseStorage()
-        url = self.complex_out.ensure_storage()
+        url = self.complex_out.export()
         self.assertEqual('http', urlparse(url).scheme)
 
     def test_json(self):

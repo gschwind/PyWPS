@@ -176,6 +176,8 @@ class Process(object):
     def clean(self):
         """Clean the process working dir and other temporary files
         """
+
+        print("XXXXX Clean dir")
         if config.get_config_value('server', 'cleantempdir'):
             LOGGER.info("Removing temporary working directory: {}".format(self.workdir))
             try:

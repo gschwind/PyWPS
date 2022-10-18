@@ -67,6 +67,14 @@ class ExecuteResponse(WPSResponse):
         if clean:
             if self.status == WPS_STATUS.SUCCEEDED or self.status == WPS_STATUS.FAILED:
                 LOGGER.debug("clean workdir: status={}".format(status))
+
+                # Store outputs before they get removed
+                for o in self.outputs.values():
+                    if isinstance(o, pywps.inout.outputs.ComplexOutput):
+                        o.ensure_storage()
+
+                # remove input, they should not be used anymore
+                self.inputs = { }
                 self.process.clean()
 
     def update_status(self, message, status_percentage=None):
@@ -230,4 +238,6 @@ class ExecuteResponse(WPSResponse):
                                 headers={'Content-Disposition': 'attachment; filename="{}"'
                                          .format(wps_output_identifier + suffix)})
         else:
+            # Here StatusResponse need only outputs and their value.
+            # They are picked in json['process']['outputs']
             return StatusResponse(self.json, self.mimetype)

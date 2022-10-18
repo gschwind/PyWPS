@@ -4,10 +4,12 @@
 ##################################################################
 import io
 import json
+import sys
 from pathlib import PurePath
 
 from pywps.inout.formats import Supported_Formats
 from pywps.inout.types import Translations
+from pywps.inout.storage import new_storage
 from pywps.translations import lower_case_dict
 from io import StringIO
 import os
@@ -284,6 +286,8 @@ class IOHandler(object):
             input_file_name = tempfile.mkstemp(
                 suffix=suffix, prefix=prefix + '_',
                 dir=self.workdir)[1]
+        else:
+            open(file_name, "w")
 
         return input_file_name
 
@@ -319,6 +323,11 @@ class IOHandler(object):
 
     @file.setter
     def file(self, value):
+        #import traceback
+        #print("="*80)
+        print(f"Create FileHandler {value}")
+        #traceback.print_stack(file=sys.stdout)
+        #print("="*80)
         self._iohandler = FileHandler(value, self)
         self._check_valid()
 
@@ -338,6 +347,7 @@ class IOHandler(object):
 
     @data.setter
     def data(self, value):
+        print(f"Create DataHandler {value}")
         self._iohandler = DataHandler(value, self)
         self._check_valid()
 
@@ -349,6 +359,7 @@ class IOHandler(object):
 
     @stream.setter
     def stream(self, value):
+        print(f"Create StreamHandler {value}")
         self._iohandler = StreamHandler(value, self)
         self._check_valid()
 
@@ -359,6 +370,7 @@ class IOHandler(object):
 
     @url.setter
     def url(self, value):
+        print(f"Create URlHandler {value}")
         self._iohandler = UrlHandler(value, self)
         self._check_valid()
 
@@ -477,6 +489,7 @@ class DataHandler(FileHandler):
         """
         if self._file is None:
             self._file = self._ref()._build_file_name()
+            print(f"YYYY Create File {self._file}")
             openmode = self._openmode(self.data)
             kwargs = {} if 'b' in openmode else {'encoding': 'utf8'}
             with open(self._file, openmode, **kwargs) as fh:
@@ -1014,6 +1027,7 @@ class ComplexInput(BasicIO, BasicComplex, IOHandler):
             LOGGER.warning("Could not link file reference")
             shutil.copy2(inpt_file, tmp_file)
 
+        print(f"XXXX {tmp_file}")
         return tmp_file
 
     def url_handler(self, inpt):
@@ -1113,8 +1127,15 @@ class ComplexOutput(BasicIO, BasicComplex, IOHandler):
             self._storage = storage
 
     # Ensure the storage of handled data to be able to expose it to with url
-    # return the corresponding url
     def ensure_storage(self):
+
+        # No data where provided
+        if self.stream is None:
+            return
+
+        if self._storage is None:
+            self._storage = new_storage()
+
         # Copy data to the storage
         with self.stream as fi:
             # TODO: sanitise self.stream to always provide a binary stream.
@@ -1127,4 +1148,7 @@ class ComplexOutput(BasicIO, BasicComplex, IOHandler):
                     fo.write(s)
                     s = fi.read(4096)
                 # TODO: For now the __exit__ is not implemented properly
+
+    # Give to the data store an url
+    def export(self):
         return self._storage.export(self.identifier + self.data_format.extension, self.data_format.mime_type)

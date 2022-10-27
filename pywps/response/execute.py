@@ -2,7 +2,7 @@
 # Copyright 2018 Open Source Geospatial Foundation and others    #
 # licensed under MIT, Please consult LICENSE.txt for details     #
 ##################################################################
-
+import copy
 import json
 import logging
 import time
@@ -42,7 +42,7 @@ class ExecuteResponse(WPSResponse):
         super(ExecuteResponse, self).__init__(wps_request, uuid)
 
         self.process = kwargs["process"]
-        self.outputs = {o.identifier: o for o in self.process.outputs}
+        self.outputs = {o.identifier: copy.deepcopy(o) for o in self.process.outputs}
         self.store_status_file = False
 
         # select the output mimetype

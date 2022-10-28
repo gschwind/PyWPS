@@ -718,7 +718,7 @@ class BasicLiteral:
             self._uom = uom
 
 
-class BasicComplex(object):
+class BasicComplex:
     """Basic complex input/output class
 
     """
@@ -800,7 +800,7 @@ class BasicComplex(object):
         return False
 
 
-class BasicBoundingBox(object):
+class BasicBoundingBox:
     """Basic BoundingBox input/output class
     """
 

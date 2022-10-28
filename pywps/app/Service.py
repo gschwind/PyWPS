@@ -164,6 +164,7 @@ class Service(object):
         if fetch_inputs:
             wps_request = Service._parse_request_inputs(process, wps_request)
         wps_response = ExecuteResponse(wps_request, process=process, uuid=process.uuid)
+        process.setup_outputs_from_wps_request(wps_request, wps_response)
         # Store status file if the process is asynchronous
         wps_response.store_status_file = wps_request.is_async
         return process, wps_request, wps_response

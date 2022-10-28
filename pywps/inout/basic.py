@@ -1128,7 +1128,7 @@ class ComplexOutput(BasicIO, BasicComplex, IOHandler):
 
     # Ensure the storage of handled data to be able to expose it to with url
     def ensure_storage(self):
-
+        print(f"Try store {self.identifier}")
         # No data where provided
         if self.stream is None:
             return

@@ -223,6 +223,7 @@ def store_status(session, uuid, wps_status, message=None, status_percentage=None
 # Update or create a store instance
 @guard_session
 def update_storage_record(session, store_instance):
+    print(f"update storage {store_instance.mimetype} {store_instance.pretty_filename} {store_instance.dump()}")
     r = session.query(StorageRecord).filter_by(uuid=str(store_instance.uuid))
     if r.count():
         store_instance_record = r.one()

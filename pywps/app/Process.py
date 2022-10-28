@@ -126,7 +126,6 @@ class Process(object):
         # so that processes are not overriding each other
         # just for execute
         process = copy.deepcopy(self)
-        process.setup_outputs_from_wps_request(wps_request)
         workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
         tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
         process.set_workdir(tempdir)
@@ -321,7 +320,7 @@ class Process(object):
                          os.environ.get('GISRC'), os.environ.get('GISBASE'),
                          dbase, location, os.path.basename(mapset_name)))
 
-    def setup_outputs_from_wps_request(self, wps_request):
+    def setup_outputs_from_wps_request(self, wps_request : WPSRequest, wps_response):
         # set as_reference to True for all the outputs specified as reference
         # if the output is not required to be raw
         if not wps_request.raw:
@@ -344,10 +343,12 @@ class Process(object):
 
                 for outpt in self.outputs:
                     if outpt.identifier == wps_outpt:
-                        outpt.as_reference = is_reference
-                        if isinstance(outpt, ComplexOutput) and mimetype:
+                        o = outpt.clone()
+                        o.as_reference = is_reference
+                        if isinstance(o, ComplexOutput) and mimetype:
                             data_format = [f for f in outpt.supported_formats if f.mime_type == mimetype]
                             if len(data_format) == 0:
                                 raise InvalidParameterValue(
                                     f"MimeType {mimetype} not valid")
-                            outpt.data_format = data_format[0]
+                            o.data_format = data_format[0]
+                        wps_response.outputs[o.identifier] = o

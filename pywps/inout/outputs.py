@@ -37,42 +37,19 @@ class BoundingBoxOutput(basic.BBoxOutput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier, title, crss, abstract='', keywords=[],
-                 dimensions=2, metadata=[], min_occurs='1',
-                 max_occurs='1', as_reference=False,
-                 mode=MODE.NONE, translations=None):
-        basic.BBoxOutput.__init__(self, identifier, title=title,
-                                  abstract=abstract, keywords=keywords, crss=crss,
-                                  dimensions=dimensions, mode=mode, translations=translations)
-
-        self.metadata = metadata
-        self.min_occurs = min_occurs
-        self.max_occurs = max_occurs
+    def __init__(self, as_reference=False, **kwargs):
+        super().__init__(**kwargs)
         self.as_reference = as_reference
+
+    def as_json(self):
+        return super().as_json()
+
 
     @property
     def json(self):
         """Get JSON representation of the output
         """
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'min_occurs': self.min_occurs,
-            'max_occurs': self.max_occurs,
-            'metadata': self.metadata,
-            'type': 'bbox',
-            'crs': self.crs,
-            'crss': self.crss,
-            'dimensions': self.dimensions,
-            'bbox': self.data,
-            'll': self.ll,
-            'ur': self.ur,
-            'workdir': self.workdir,
-            'mode': self.valid_mode,
-            'translations': self.translations,
-        }
+        return self.as_json()
 
     @classmethod
     def from_json(cls, json_output):
@@ -111,43 +88,21 @@ class ComplexOutput(basic.ComplexOutput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier: str, title: str, supported_formats: Supported_Formats = None,
-                 data_format=None, abstract: str = '', keywords=[], workdir=None,
-                 metadata: Optional[Sequence[Metadata]] = None,
-                 as_reference=False, mode: MODE = MODE.NONE, translations: Translations = None):
-        if metadata is None:
-            metadata = []
+    def __init__(self, as_reference=False, **kwargs):
+        super().__init__(**kwargs)
 
-        basic.ComplexOutput.__init__(self, identifier, title=title,
-                                     data_format=data_format, abstract=abstract, keywords=keywords,
-                                     workdir=workdir,
-                                     supported_formats=supported_formats,
-                                     mode=mode, translations=translations)
-        self.metadata = metadata
         self.as_reference = as_reference
-
         self.storage = None
+
+    def as_json(self):
+        data = super().as_json()
+        data['asreference'] = self.as_reference
 
     @property
     def json(self):
         """Get JSON representation of the output
         """
-        data = {
-            "identifier": self.identifier,
-            "title": self.title,
-            "abstract": self.abstract,
-            'keywords': self.keywords,
-            'type': 'complex',
-            'supported_formats': [frmt.json for frmt in self.supported_formats],
-            'asreference': self.as_reference,
-            'data_format': self.data_format.json if self.data_format else None,
-            'file': self.file if self.prop == 'file' else None,
-            'workdir': self.workdir,
-            'mode': self.valid_mode,
-            'min_occurs': self.min_occurs,
-            'max_occurs': self.max_occurs,
-            'translations': self.translations,
-        }
+        data = self.as_json()
 
         if self.data_format:
             if self.data_format.mime_type:

@@ -697,12 +697,15 @@ class BasicIO:
         }
 
 
-class BasicLiteral:
+class BasicLiteral(BasicIO):
     """Basic literal Input/Output class
     """
 
-    def __init__(self, data_type="integer", uoms=None):
+    def __init__(self, data_type="integer", uoms=None, **kwargs):
         assert data_type in LITERAL_DATA_TYPES
+
+        super().__init__(**kwargs)
+
         self.data_type = data_type
         # list of uoms
         self.uoms = []
@@ -729,13 +732,22 @@ class BasicLiteral:
         if uom is not None:
             self._uom = uom
 
+    def as_json(self):
+        data = super().as_json()
+        data['data_type'] = self.data_type
+        if self.uoms:
+            data["uoms"] = [uom.json for uom in self.uoms]
+        return data
 
-class BasicComplex:
+
+class BasicComplex(BasicIO):
     """Basic complex input/output class
 
     """
 
-    def __init__(self, data_format=None, supported_formats=None):
+    def __init__(self, data_format=None, supported_formats=None, **kwargs):
+        super().__init__(**kwargs)
+
         self._data_format = data_format
         self._supported_formats = ()
         if supported_formats:
@@ -812,11 +824,13 @@ class BasicComplex:
         return False
 
 
-class BasicBoundingBox:
+class BasicBoundingBox(BasicIO):
     """Basic BoundingBox input/output class
     """
 
-    def __init__(self, crss=None, dimensions=2):
+    def __init__(self, crss=None, dimensions=2, **kwargs):
+        super().__init__(**kwargs)
+
         self._data = None
         self.crss = crss or ['epsg:4326']
         self.crs = self.crss[0]
@@ -848,27 +862,14 @@ class BasicBoundingBox:
         return []
 
 
-class LiteralInput(BasicIO, BasicLiteral, SimpleHandler):
+class LiteralInput(BasicLiteral):
     """LiteralInput input abstract class
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 data_type="integer", workdir=None, allowed_values=None,
-                 uoms=None, mode=MODE.NONE,
-                 min_occurs=1, max_occurs=1, metadata=[],
-                 default=None, default_type=SOURCE_TYPE.DATA, translations=None):
-        BasicIO.__init__(self,
-                         identifier=identifier,
-                         title=title,
-                         abstract=abstract,
-                         keywords=keywords,
-                         min_occurs=min_occurs,
-                         max_occurs=max_occurs,
-                         metadata=metadata,
-                         translations=translations,
-                         )
-        BasicLiteral.__init__(self, data_type, uoms)
-        SimpleHandler.__init__(self, workdir, data_type, mode=mode)
+    def __init__(self, allowed_values=None,
+                 default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
+
+        BasicLiteral.__init__(self, **kwargs)
 
         if default_type != SOURCE_TYPE.DATA:
             raise InvalidParameterValue("Source types other than data are not supported.")
@@ -909,17 +910,12 @@ class LiteralInput(BasicIO, BasicLiteral, SimpleHandler):
             return validate_value
 
 
-class LiteralOutput(BasicIO, BasicLiteral, SimpleHandler):
+class LiteralOutput(BasicLiteral):
     """Basic LiteralOutput class
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 data_type=None, workdir=None, uoms=None, validate=None,
-                 mode=MODE.NONE, translations=None):
-        BasicIO.__init__(self, identifier, title, abstract, keywords, translations=translations)
-        BasicLiteral.__init__(self, data_type, uoms)
-        SimpleHandler.__init__(self, workdir=None, data_type=data_type,
-                               mode=mode)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._storage = None
 
@@ -939,27 +935,13 @@ class LiteralOutput(BasicIO, BasicLiteral, SimpleHandler):
         return validate_anyvalue
 
 
-class BBoxInput(BasicIO, BasicBoundingBox, IOHandler):
+class BBoxInput(BasicBoundingBox):
     """Basic Bounding box input abstract class
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=[], crss=None,
-                 dimensions=None, workdir=None,
-                 mode=MODE.SIMPLE,
-                 min_occurs=1, max_occurs=1, metadata=[],
-                 default=None, default_type=SOURCE_TYPE.DATA, translations=None):
-        BasicIO.__init__(self,
-                         identifier=identifier,
-                         title=title,
-                         abstract=abstract,
-                         keywords=keywords,
-                         min_occurs=min_occurs,
-                         max_occurs=max_occurs,
-                         metadata=metadata,
-                         translations=translations,
-                         )
-        BasicBoundingBox.__init__(self, crss, dimensions)
-        IOHandler.__init__(self, workdir=workdir, mode=mode)
+    def __init__(self, default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
+
+        super().__init__(**kwargs)
 
         if default_type != SOURCE_TYPE.DATA:
             raise InvalidParameterValue("Source types other than data are not supported.")
@@ -970,15 +952,12 @@ class BBoxInput(BasicIO, BasicBoundingBox, IOHandler):
         self._set_default_value(default, default_type)
 
 
-class BBoxOutput(BasicIO, BasicBoundingBox, IOHandler):
+class BBoxOutput(BasicBoundingBox):
     """Basic BoundingBox output class
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=None, crss=None,
-                 dimensions=None, workdir=None, mode=MODE.NONE, translations=None):
-        BasicIO.__init__(self, identifier, title, abstract, keywords, translations=translations)
-        BasicBoundingBox.__init__(self, crss, dimensions)
-        IOHandler.__init__(self, workdir=workdir, mode=mode)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._storage = None
 
     @property
@@ -990,7 +969,7 @@ class BBoxOutput(BasicIO, BasicBoundingBox, IOHandler):
         self._storage = storage
 
 
-class ComplexInput(BasicIO, BasicComplex, IOHandler):
+class ComplexInput(BasicComplex):
     """Complex input abstract class
 
     >>> ci = ComplexInput()
@@ -999,23 +978,8 @@ class ComplexInput(BasicIO, BasicComplex, IOHandler):
     1
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 workdir=None, data_format=None, supported_formats=None,
-                 mode=MODE.NONE,
-                 min_occurs=1, max_occurs=1, metadata=[],
-                 default=None, default_type=SOURCE_TYPE.DATA, translations=None):
-        BasicIO.__init__(self,
-                         identifier=identifier,
-                         title=title,
-                         abstract=abstract,
-                         keywords=keywords,
-                         min_occurs=min_occurs,
-                         max_occurs=max_occurs,
-                         metadata=metadata,
-                         translations=translations,
-                         )
-        IOHandler.__init__(self, workdir=workdir, mode=mode)
-        BasicComplex.__init__(self, data_format, supported_formats)
+    def __init__(self, default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
+        super().__init__(**kwargs)
 
         self._default = default
         self._default_type = default_type
@@ -1091,7 +1055,7 @@ class ComplexInput(BasicIO, BasicComplex, IOHandler):
         raise FileURLNotSupported()
 
 
-class ComplexOutput(BasicIO, BasicComplex, IOHandler):
+class ComplexOutput(BasicComplex):
     """Complex output abstract class
 
     >>> # temporary configuration
@@ -1119,12 +1083,8 @@ class ComplexOutput(BasicIO, BasicComplex, IOHandler):
     'AA'
     """
 
-    def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 workdir=None, data_format=None, supported_formats: Supported_Formats = None,
-                 mode=MODE.NONE, translations: Translations = None):
-        BasicIO.__init__(self, identifier, title, abstract, keywords, translations=translations)
-        IOHandler.__init__(self, workdir=workdir, mode=mode)
-        BasicComplex.__init__(self, data_format, supported_formats)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._storage = None
 

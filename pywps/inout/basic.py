@@ -674,14 +674,14 @@ class BasicIO:
     """
 
     def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 min_occurs=1, max_occurs=1, metadata=[], translations=None):
+                 min_occurs=1, max_occurs=1, metadata=None, translations=None):
         self.identifier = identifier
         self.title = title
         self.abstract = abstract
         self.keywords = keywords
         self.min_occurs = int(min_occurs) if min_occurs is not None else 0
         self.max_occurs = int(max_occurs) if max_occurs is not None else None
-        self.metadata = metadata
+        self.metadata = metadata if metadata is not None else []
         self.translations = lower_case_dict(translations)
 
 

@@ -684,6 +684,18 @@ class BasicIO:
         self.metadata = metadata if metadata is not None else []
         self.translations = lower_case_dict(translations)
 
+    def as_json(self):
+        return {
+            'identifier': self.identifier,
+            'title': self.title,
+            'abstract': self.abstract,
+            'keywords': self.keywords,
+            'min_occurs': self.min_occurs,
+            'max_occurs': self.max_occurs,
+            'metadata': self.metadata,
+            'translations': self.translations
+        }
+
 
 class BasicLiteral:
     """Basic literal Input/Output class

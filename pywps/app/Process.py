@@ -70,6 +70,79 @@ class Process(object):
         self.version = version
         self.inputs = inputs if inputs is not None else []
         self.outputs = outputs if outputs is not None else []
+        self.grass_location = grass_location
+        self.translations = lower_case_dict(translations)
+
+        if store_supported:
+            self.store_supported = 'true'
+        else:
+            self.store_supported = 'false'
+
+        if status_supported:
+            self.status_supported = 'true'
+        else:
+            self.status_supported = 'false'
+
+
+    # Used for DescribeProcess
+    @property
+    def json(self):
+        return {
+            'class': '{}:{}'.format(self.__module__, self.__class__.__name__),
+            'version': self.version,
+            'identifier': self.identifier,
+            'title': self.title,
+            'abstract': self.abstract,
+            'keywords': self.keywords,
+            'metadata': [m.json for m in self.metadata],
+            'inputs': [i.as_json() for i in self.inputs],
+            'outputs': [o.as_json() for o in self.outputs],
+            'store_supported': self.store_supported,
+            'status_supported': self.status_supported,
+            'profile': [p for p in self.profile],
+            'translations': self.translations,
+        }
+
+
+# TODO: Private
+class ProcessInstance(object):
+    """
+    :param handler: A callable that gets invoked for each incoming
+                    request. It should accept a single
+                    :class:`pywps.app.WPSRequest` argument and return a
+                    :class:`pywps.app.WPSResponse` object.
+    :param string identifier: Name of this process.
+    :param string title: Human readable title of process.
+    :param string abstract: Brief narrative description of the process.
+    :param list keywords: Keywords that characterize a process.
+    :param inputs: List of inputs accepted by this process. They
+                   should be :class:`~LiteralInput` and :class:`~ComplexInput`
+                   and :class:`~BoundingBoxInput`
+                   objects.
+    :param outputs: List of outputs returned by this process. They
+                   should be :class:`~LiteralOutput` and :class:`~ComplexOutput`
+                   and :class:`~BoundingBoxOutput`
+                   objects.
+    :param metadata: List of metadata advertised by this process. They
+                     should be :class:`pywps.app.Common.Metadata` objects.
+    :param dict[str,dict[str,str]] translations: The first key is the RFC 4646 language code,
+        and the nested mapping contains translated strings accessible by a string property.
+        e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
+    """
+
+    def __init__(self, handler, identifier, title, abstract='', keywords=None, profile=None,
+                 metadata=None, inputs=None, outputs=None, version='None', store_supported=False,
+                 status_supported=False, grass_location=None, translations=None):
+        self.identifier = identifier
+        self.handler = handler
+        self.title = title
+        self.abstract = abstract
+        self.keywords = keywords if keywords is not None else []
+        self.metadata = metadata if metadata is not None else []
+        self.profile = profile if profile is not None else []
+        self.version = version
+        self.inputs = inputs if inputs is not None else []
+        self.outputs = outputs if outputs is not None else []
         self.uuid = None
         self.workdir = None
         self._grass_mapset = None
@@ -86,9 +159,9 @@ class Process(object):
         else:
             self.status_supported = 'false'
 
+    # Used for describe process
     @property
     def json(self):
-
         return {
             'class': '{}:{}'.format(self.__module__, self.__class__.__name__),
             'uuid': str(self.uuid),
@@ -99,26 +172,30 @@ class Process(object):
             'abstract': self.abstract,
             'keywords': self.keywords,
             'metadata': [m.json for m in self.metadata],
-            'inputs': [i.json for i in self.inputs],
-            'outputs': [o.json for o in self.outputs],
+            'inputs': [i.as_json() for i in self.inputs],
+            'outputs': [o.as_json() for o in self.outputs],
             'store_supported': self.store_supported,
             'status_supported': self.status_supported,
             'profile': [p for p in self.profile],
             'translations': self.translations,
         }
 
-    @classmethod
-    def from_json(cls, value):
-        """init this process from json back again
+    def from_json(self, *args, **kwargs):
+        raise NotImplementedError("XXXX")
 
-        :param value: the json (not string) representation
-        """
-        module, classname = value['class'].split(':')
-        # instantiate subclass of Process
-        new_process = getattr(importlib.import_module(module), classname)()
-        new_process._set_uuid(value['uuid'])
-        new_process.set_workdir(value['workdir'])
-        return new_process
+    # Should not be used
+    # @classmethod
+    # def from_json(cls, value):
+    #     """init this process from json back again
+    #
+    #     :param value: the json (not string) representation
+    #     """
+    #     module, classname = value['class'].split(':')
+    #     # instantiate subclass of Process
+    #     new_process = getattr(importlib.import_module(module), classname)()
+    #     new_process._set_uuid(value['uuid'])
+    #     new_process.set_workdir(value['workdir'])
+    #     return new_process
 
     def new_instance(self, wps_request: WPSRequest):
         """Generate a new instance of that process with a new temporary directory"""

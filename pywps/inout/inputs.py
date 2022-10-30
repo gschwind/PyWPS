@@ -5,6 +5,7 @@
 import base64
 import re
 from pywps import xml_util as etree
+import logging
 
 from pywps.app.Common import Metadata
 from pywps.exceptions import InvalidParameterValue
@@ -16,9 +17,10 @@ from pywps.inout.literaltypes import AnyValue, NoValue, ValuesReference, Allowed
 
 CDATA_PATTERN = re.compile(r'<!\[CDATA\[(.*?)\]\]>')
 
+LOGGER = logging.getLogger("PYWPS")
 
-class BoundingBoxInput(basic.BBoxInput):
-
+class BoundingBoxInput(basic.IOHandler):
+    type = 'bbox'
     """
     :param string identifier: The name of this input.
     :param string title: Human readable title
@@ -38,63 +40,31 @@ class BoundingBoxInput(basic.BBoxInput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier, title, crss=None, abstract='', keywords=[],
-                 dimensions=2, workdir=None, metadata=[], min_occurs=1,
-                 max_occurs=1,
-                 mode=MODE.NONE,
-                 default=None, default_type=basic.SOURCE_TYPE.DATA,
-                 translations=None):
-
-        basic.BBoxInput.__init__(self, identifier, title=title, crss=crss,
-                                 abstract=abstract, keywords=keywords,
-                                 dimensions=dimensions, workdir=workdir, metadata=metadata,
-                                 min_occurs=min_occurs, max_occurs=max_occurs,
-                                 mode=mode, default=default,
-                                 default_type=default_type,
-                                 translations=translations)
-
+    def __init__(self, spec, json=None, *args, **kwargs):
+        super().__init__(spec, *args, **kwargs)
+        # Not used ?
         self.as_reference = False
+
+        if json is not None:
+            self.src_data = json.get('data')
+            self.data = self.src_data
+            LOGGER.debug(f'newinpt bbox data={self.data}')
+            self.crs = json.get('crs')
+            self.dimensions = json.get('dimensions')
+
+    def as_json(self):
+        return super().as_json()
 
     @property
     def json(self):
-        """Get JSON representation of the input
-        """
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'type': 'bbox',
-            'crs': self.crs,
-            'crss': self.crss,
-            'metadata': [m.json for m in self.metadata],
-            'bbox': self.data,
-            'll': self.ll,
-            'ur': self.ur,
-            'dimensions': self.dimensions,
-            'workdir': self.workdir,
-            'mode': self.valid_mode,
-            'min_occurs': self.min_occurs,
-            'max_occurs': self.max_occurs,
-            'translations': self.translations,
-        }
+        return self.as_json()
 
     @classmethod
-    def from_json(cls, json_input):
-        instance = cls(
-            identifier=json_input['identifier'],
-            title=json_input.get('title'),
-            abstract=json_input.get('abstract'),
-            crss=json_input.get('crss'),
-            keywords=json_input.get('keywords'),
-            metadata=[Metadata.from_json(data) for data in json_input.get('metadata', [])],
-            dimensions=json_input.get('dimensions'),
-            workdir=json_input.get('workdir'),
-            mode=json_input.get('mode'),
-            min_occurs=json_input.get('min_occurs'),
-            max_occurs=json_input.get('max_occurs'),
-            translations=json_input.get('translations'),
-        )
+    def from_json(cls, spec, json_input):
+
+        json_input_filtered = {k: json_input[k] for k in ({'identifier'}&json_input.keys())}
+
+        instance = cls(spec, **json_input_filtered)
         instance.data = json_input['bbox']
 
         return instance
@@ -105,7 +75,8 @@ class BoundingBoxInput(basic.BBoxInput):
         return deepcopy(self)
 
 
-class ComplexInput(basic.ComplexInput):
+class ComplexInput(basic.IOHandler):
+    type = 'complex'
     """
     Complex data input
 
@@ -126,43 +97,34 @@ class ComplexInput(basic.ComplexInput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier, title, supported_formats,
-                 data_format=None, abstract='', keywords=[], workdir=None, metadata=[], min_occurs=1,
-                 max_occurs=1, mode=MODE.NONE,
-                 default=None, default_type=basic.SOURCE_TYPE.DATA, translations=None):
-        """constructor"""
-
-        basic.ComplexInput.__init__(self, identifier, title=title,
-                                    supported_formats=supported_formats,
-                                    data_format=data_format, abstract=abstract,
-                                    keywords=keywords, workdir=workdir, metadata=metadata,
-                                    min_occurs=min_occurs,
-                                    max_occurs=max_occurs, mode=mode,
-                                    default=default, default_type=default_type, translations=translations)
-
+    def __init__(self, spec, json=None, *args, **kwargs):
+        super().__init__(spec, *args, **kwargs)
         self.as_reference = False
-        self.method = ''
 
-    @property
-    def json(self):
-        """Get JSON representation of the input
-        """
-        data = {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': [m.json for m in self.metadata],
-            'type': 'complex',
-            'data_format': self.data_format.json,
-            'asreference': self.as_reference,
-            'supported_formats': [frmt.json for frmt in self.supported_formats],
-            'workdir': self.workdir,
-            'mode': self.valid_mode,
-            'min_occurs': self.min_occurs,
-            'max_occurs': self.max_occurs,
-            'translations': self.translations,
-        }
+        if json is not None:
+            frmt = spec.supported_formats[0]
+            if 'mimeType' in json:
+                if json['mimeType']:
+                    frmt = spec.get_format(json['mimeType'])
+                else:
+                    frmt = spec.data_format
+
+            if frmt:
+                spec.data_format = frmt
+            else:
+                raise InvalidParameterValue(
+                    'Invalid mimeType value {} for input {}'.format(json.get('mimeType'), spec.identifier),
+                    'mimeType')
+
+            self.method = json.get('method', 'GET')
+            self.process(json)
+
+
+    def as_json(self):
+        data = self.spec.as_json()
+        data.update({
+            'asreference': self.as_reference
+        })
 
         if self.prop == 'file':
             data['file'] = self.file
@@ -183,6 +145,10 @@ class ComplexInput(basic.ComplexInput):
                 data['schema'] = self.data_format.schema
 
         return data
+
+    @property
+    def json(self):
+        return self.as_json()
 
     @classmethod
     def from_json(cls, json_input):
@@ -258,13 +224,27 @@ class ComplexInput(basic.ComplexInput):
 
         return data
 
-    def clone(self):
-        """Create copy of yourself
-        """
-        return deepcopy(self)
+
+    def process(self, inpt):
+        """Subclass with the appropriate handler given the data input."""
+        href = inpt.get('href', None)
+        self.inpt = inpt
+
+        if href:
+            if urlparse(href).scheme == 'file':
+                self.file = self.file_handler(inpt)
+
+            else:
+                # No file download occurs here. The file content will
+                # only be retrieved when the file property is accessed.
+                self.url = self.url_handler(inpt)
+
+        else:
+            self.data = inpt.get('data')
 
 
-class LiteralInput(basic.LiteralInput):
+class LiteralInput(basic.IOHandler):
+    type = 'literal'
     """
     :param str identifier: The name of this input.
     :param str title: Title of the input
@@ -285,24 +265,17 @@ class LiteralInput(basic.LiteralInput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier, title=None, data_type=None, workdir=None, abstract='', keywords=[],
-                 metadata=[], uoms=None,
-                 min_occurs=1, max_occurs=1,
-                 mode=MODE.SIMPLE, allowed_values=None,
-                 default=None, default_type=basic.SOURCE_TYPE.DATA, translations=None):
-        """Constructor
-        """
-        data_type = data_type or 'string'
-        basic.LiteralInput.__init__(self, identifier, title=title,
-                                    data_type=data_type, workdir=workdir, abstract=abstract,
-                                    keywords=keywords, metadata=metadata,
-                                    uoms=uoms, min_occurs=min_occurs,
-                                    max_occurs=max_occurs, mode=mode,
-                                    allowed_values=allowed_values,
-                                    default=default, default_type=default_type,
-                                    translations=translations)
-
+    def __init__(self, spec, json=None, *args, **kwargs):
+        super(LiteralInput, self).__init__(spec, *args, **kwargs)
         self.as_reference = False
+
+        if json is not None:
+            # set the input to the type defined in the process
+            self.uom = json.get('uom')
+            self.data_type = json.get('datatype', None)
+            # get the value of the field
+            self.src_data = json.get('data', None)
+            self.data = self.src_data
 
     @property
     def json(self):
@@ -331,8 +304,8 @@ class LiteralInput(basic.LiteralInput):
             data["uoms"] = [uom.json for uom in self.uoms]
         if self.uom:
             data["uom"] = self.uom.json
-        if self.data is not None:
-            data['data'] = str(self.data)
+        if self.src_data is not None:
+            data['data'] = str(self.src_data)
         return data
 
     @classmethod
@@ -372,9 +345,7 @@ class LiteralInput(basic.LiteralInput):
         return instance
 
     def clone(self):
-        """Create copy of yourself
-        """
-        return deepcopy(self)
+        raise NotImplementedError("Do not clone")
 
 
 def input_from_json(json_data):

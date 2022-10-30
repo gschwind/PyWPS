@@ -20,7 +20,7 @@ from pywps import configuration as config
 from pywps.inout.formats import Format, Supported_Formats, FORMATS
 
 
-class BoundingBoxOutput(basic.BBoxOutput):
+class BoundingBoxOutput(basic.IOHandler):
     """
     :param identifier: The name of this input.
     :param str title: Title of the input
@@ -37,12 +37,12 @@ class BoundingBoxOutput(basic.BBoxOutput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, as_reference=False, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, spec, *args, as_reference=False, **kwargs):
+        super().__init__(spec, *args, **kwargs)
         self.as_reference = as_reference
 
     def as_json(self):
-        return super().as_json()
+        return self.spec.as_json()
 
 
     @property
@@ -72,7 +72,7 @@ class BoundingBoxOutput(basic.BBoxOutput):
         return instance
 
 
-class ComplexOutput(basic.ComplexOutput):
+class ComplexOutput(basic.IOHandler):
     """
     :param identifier: The name of this output.
     :param title: Readable form of the output name.
@@ -88,8 +88,8 @@ class ComplexOutput(basic.ComplexOutput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, as_reference=False, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, spec, *args, as_reference=False, **kwargs):
+        super().__init__(spec, *args, **kwargs)
 
         self.as_reference = as_reference
         self.storage = None
@@ -221,7 +221,7 @@ class ComplexOutput(basic.ComplexOutput):
         return data
 
 
-class LiteralOutput(basic.LiteralOutput):
+class LiteralOutput(basic.IOHandler):
     """
     :param identifier: The name of this output.
     :param str title: Title of the input
@@ -236,33 +236,14 @@ class LiteralOutput(basic.LiteralOutput):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, identifier, title, data_type='string', abstract='', keywords=[],
-                 metadata=[], uoms=None, mode=MODE.SIMPLE, translations=None):
-        if uoms is None:
-            uoms = []
-        basic.LiteralOutput.__init__(self, identifier, title=title, abstract=abstract, keywords=keywords,
-                                     data_type=data_type, uoms=uoms, mode=mode, translations=translations)
-        self.metadata = metadata
+    def __init__(self, spec, *args, **kwargs):
+        super().__init__(spec, *args, **kwargs)
 
     @property
     def json(self):
         """Get JSON representation of the output
         """
-        data = {
-            "identifier": self.identifier,
-            "title": self.title,
-            "abstract": self.abstract,
-            "keywords": self.keywords,
-            "data": self.data,
-            "data_type": self.data_type,
-            "type": "literal",
-            "uoms": [u.json for u in self.uoms],
-            "translations": self.translations,
-        }
-
-        if self.uom:
-            data["uom"] = self.uom.json
-
+        data = self.spec.as_json()
         return data
 
     @classmethod

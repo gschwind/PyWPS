@@ -9,8 +9,8 @@ from pathlib import PurePath
 
 from pywps.inout.formats import Supported_Formats
 from pywps.inout.types import Translations
-from pywps.inout.storage import new_storage
-from pywps.translations import lower_case_dict
+from pywps.inout.storage import new_storage, get_storage_instance
+
 from io import StringIO
 import os
 from io import open
@@ -19,17 +19,9 @@ import requests
 import tempfile
 import logging
 import pywps.configuration as config
-from pywps.inout.literaltypes import (LITERAL_DATA_TYPES, convert,
-                                      make_allowedvalues, is_anyvalue,
-                                      is_values_reference)
-from pywps import OGCUNIT
+
 from pywps.validator.mode import MODE
-from pywps.validator.base import emptyvalidator
-from pywps.validator import get_validator
-from pywps.validator.literalvalidator import (validate_value,
-                                              validate_anyvalue,
-                                              validate_allowed_values,
-                                              validate_values_reference)
+
 from pywps.exceptions import NoApplicableCode, InvalidParameterValue, FileSizeExceeded, \
     FileURLNotSupported
 from urllib.parse import urlparse
@@ -61,27 +53,6 @@ def _is_textfile(filename):
         is_text = b'\x00' not in fh.read(blocksize)
         fh.close()
     return is_text
-
-
-class UOM(object):
-    """
-    :param uom: unit of measure
-    """
-
-    def __init__(self, uom='', reference=None):
-        self.uom = uom
-        self.reference = reference
-
-        if self.reference is None:
-            self.reference = OGCUNIT[self.uom]
-
-    @property
-    def json(self):
-        return {"reference": self.reference,
-                "uom": self.uom}
-
-    def __eq__(self, other):
-        return self.uom == other.uom
 
 
 class NoneIOHandler(object):
@@ -136,6 +107,10 @@ class NoneIOHandler(object):
     def post_data(self, value):
         raise NotImplementedError
 
+    @property
+    def storage(self):
+        return None
+
 
 class IOHandler(object):
     """Base IO handling class that handle multple IO types
@@ -187,9 +162,12 @@ class IOHandler(object):
     >>> assert isinstance(ioh_stream.stream, RawIOBase)
     """
 
-    def __init__(self, workdir=None, mode=MODE.NONE):
-
+    def __init__(self, spec, workdir=None, mode=MODE.NONE):
         self._iohandler = NoneIOHandler(self)
+
+        # Read only
+        self._spec = spec
+        self._storage = None
 
         # Internal defaults for class and subclass properties.
         self._workdir = None
@@ -207,14 +185,11 @@ class IOHandler(object):
     def _check_valid(self):
         """Validate this input using given validator
         """
-
-        validate = self.validator
-        if validate is not None:
-            _valid = validate(self, self.valid_mode)
-            if not _valid:
-                self.data_set = False
-                raise InvalidParameterValue('Input data not valid using '
-                                            'mode {}'.format(self.valid_mode))
+        _valid = self._spec.validate(self, self.valid_mode)
+        if not _valid:
+            self.data_set = False
+            raise InvalidParameterValue('Input data not valid using '
+                                        'mode {}'.format(self.valid_mode))
         self.data_set = True
 
     @property
@@ -233,13 +208,11 @@ class IOHandler(object):
 
     @property
     def validator(self):
-        """Return the function suitable for validation
-        This method should be overridden by class children
+        return self._spec.validator
 
-        :return: validating function
-        """
-
-        return emptyvalidator
+    @property
+    def spec(self):
+        return self._spec
 
     @property
     def source_type(self):
@@ -388,6 +361,10 @@ class IOHandler(object):
     def prop(self):
         return self._iohandler.prop
 
+    # Give to the data store an url
+    def export(self):
+        return self._iohandler.storage.export(self.identifier + self.data_format.extension, self.data_format.mime_type)
+
 
 class FileHandler(NoneIOHandler):
     prop = 'file'
@@ -396,6 +373,7 @@ class FileHandler(NoneIOHandler):
         self._ref = weakref.ref(ref)
         self._data = None
         self._stream = None
+        self._storage = None
         self._file = os.path.abspath(value)
 
     @property
@@ -434,6 +412,31 @@ class FileHandler(NoneIOHandler):
         """Return url to file."""
         result = PurePath(self.file).as_uri()
         return result
+
+    # Ensure the storage of handled data to be able to expose it to with url
+    @property
+    def storage(self):
+        print(f"Try store {self.identifier}")
+
+        if self._storage is not None:
+            return self._storage
+
+        self._storage = new_storage()
+
+        # Copy data to the storage
+        with self.stream as fi:
+            # TODO: sanitise self.stream to always provide a binary stream.
+            encoding = None
+            if isinstance(fi, io.StringIO):
+                encoding = "utf-8"
+            with self._storage.open("w", encoding) as fo:
+                s = fi.read(4096)
+                while len(s) > 0:
+                    fo.write(s)
+                    s = fi.read(4096)
+                    # TODO: For now the __exit__ is not implemented properly
+
+        return self._storage
 
     @property
     def size(self):
@@ -631,496 +634,41 @@ class UrlHandler(FileHandler):
         return byte_size
 
 
-class SimpleHandler(IOHandler):
-    """Data handler for Literal In- and Outputs
+# class SimpleHandler(IOHandler):
+#     """Data handler for Literal In- and Outputs
+#
+#     >>> class Int_type(object):
+#     ...     @staticmethod
+#     ...     def convert(value): return int(value)
+#     >>>
+#     >>> class MyValidator(object):
+#     ...     @staticmethod
+#     ...     def validate(inpt): return 0 < inpt.data < 3
+#     >>>
+#     >>> inpt = SimpleHandler(data_type = Int_type)
+#     >>> inpt.validator = MyValidator
+#     >>>
+#     >>> inpt.data = 1
+#     >>> inpt.validator.validate(inpt)
+#     True
+#     >>> inpt.data = 5
+#     >>> inpt.validator.validate(inpt)
+#     False
+#     """
+#
+#     def __init__(self, workdir=None, data_type=None, mode=MODE.NONE):
+#         IOHandler.__init__(self, workdir=workdir, mode=mode)
+#         if data_type not in LITERAL_DATA_TYPES:
+#             raise ValueError('data_type {} not in {}'.format(data_type, LITERAL_DATA_TYPES))
+#         self.data_type = data_type
+#
+#     @IOHandler.data.setter
+#     def data(self, value):
+#         """Set data value. Inputs are converted into target format.
+#         """
+#         if self.data_type and value is not None:
+#             value = convert(self.data_type, value)
+#
+#         IOHandler.data.fset(self, value)
 
-    >>> class Int_type(object):
-    ...     @staticmethod
-    ...     def convert(value): return int(value)
-    >>>
-    >>> class MyValidator(object):
-    ...     @staticmethod
-    ...     def validate(inpt): return 0 < inpt.data < 3
-    >>>
-    >>> inpt = SimpleHandler(data_type = Int_type)
-    >>> inpt.validator = MyValidator
-    >>>
-    >>> inpt.data = 1
-    >>> inpt.validator.validate(inpt)
-    True
-    >>> inpt.data = 5
-    >>> inpt.validator.validate(inpt)
-    False
-    """
 
-    def __init__(self, workdir=None, data_type=None, mode=MODE.NONE):
-        IOHandler.__init__(self, workdir=workdir, mode=mode)
-        if data_type not in LITERAL_DATA_TYPES:
-            raise ValueError('data_type {} not in {}'.format(data_type, LITERAL_DATA_TYPES))
-        self.data_type = data_type
-
-    @IOHandler.data.setter
-    def data(self, value):
-        """Set data value. Inputs are converted into target format.
-        """
-        if self.data_type and value is not None:
-            value = convert(self.data_type, value)
-
-        IOHandler.data.fset(self, value)
-
-
-class BasicIO:
-    """Basic Input/Output class
-    """
-
-    def __init__(self, identifier, title=None, abstract=None, keywords=None,
-                 min_occurs=1, max_occurs=1, metadata=None, translations=None):
-        self.identifier = identifier
-        self.title = title
-        self.abstract = abstract
-        self.keywords = keywords
-        self.min_occurs = int(min_occurs) if min_occurs is not None else 0
-        self.max_occurs = int(max_occurs) if max_occurs is not None else None
-        self.metadata = metadata if metadata is not None else []
-        self.translations = lower_case_dict(translations)
-
-    def as_json(self):
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'min_occurs': self.min_occurs,
-            'max_occurs': self.max_occurs,
-            'metadata': self.metadata,
-            'translations': self.translations
-        }
-
-
-class BasicLiteral(BasicIO):
-    """Basic literal Input/Output class
-    """
-
-    def __init__(self, data_type="integer", uoms=None, **kwargs):
-        assert data_type in LITERAL_DATA_TYPES
-
-        super().__init__(**kwargs)
-
-        self.data_type = data_type
-        # list of uoms
-        self.uoms = []
-        # current uom
-        self._uom = None
-
-        # add all uoms (upcasting to UOM)
-        if uoms is not None:
-            for uom in uoms:
-                if not isinstance(uom, UOM):
-                    uom = UOM(uom)
-                self.uoms.append(uom)
-
-        if self.uoms:
-            # default/current uom
-            self.uom = self.uoms[0]
-
-    @property
-    def uom(self):
-        return self._uom
-
-    @uom.setter
-    def uom(self, uom):
-        if uom is not None:
-            self._uom = uom
-
-    def as_json(self):
-        data = super().as_json()
-        data['data_type'] = self.data_type
-        if self.uoms:
-            data["uoms"] = [uom.json for uom in self.uoms]
-        return data
-
-
-class BasicComplex(BasicIO):
-    """Basic complex input/output class
-
-    """
-
-    def __init__(self, data_format=None, supported_formats=None, **kwargs):
-        super().__init__(**kwargs)
-
-        self._data_format = data_format
-        self._supported_formats = ()
-        if supported_formats:
-            self.supported_formats = supported_formats
-
-        if data_format:
-            self.data_format = data_format
-        elif self.supported_formats:
-            # not an empty list, set the default/current format to the first
-            self.data_format = supported_formats[0]
-
-    def get_format(self, mime_type):
-        """
-        :param mime_type: given mimetype
-        :return: Format
-        """
-
-        for frmt in self.supported_formats:
-            if frmt.mime_type == mime_type:
-                return frmt
-        else:
-            return None
-
-    @property
-    def validator(self):
-        """Return the proper validator for given data_format
-        """
-        return None if self.data_format is None else self.data_format.validate
-
-    @property
-    def supported_formats(self):
-        return self._supported_formats
-
-    @supported_formats.setter
-    def supported_formats(self, supported_formats):
-        """Setter of supported formats
-        """
-
-        def set_format_validator(supported_format):
-            if not supported_format.validate or \
-               supported_format.validate == emptyvalidator:
-                supported_format.validate =\
-                    get_validator(supported_format.mime_type)
-            return supported_format
-
-        self._supported_formats = tuple(map(set_format_validator, supported_formats))
-
-    @property
-    def data_format(self):
-        return self._data_format
-
-    @data_format.setter
-    def data_format(self, data_format):
-        """self data_format setter
-        """
-        if self._is_supported(data_format):
-            self._data_format = data_format
-            if not data_format.validate or data_format.validate == emptyvalidator:
-                data_format.validate = get_validator(data_format.mime_type)
-        else:
-            raise InvalidParameterValue("Requested format {}, {}, {} not supported".format(
-                                        data_format.mime_type,
-                                        data_format.encoding,
-                                        data_format.schema),
-                                        'mimeType')
-
-    def _is_supported(self, data_format):
-
-        if self.supported_formats:
-            for frmt in self.supported_formats:
-                if frmt.same_as(data_format):
-                    return True
-
-        return False
-
-
-class BasicBoundingBox(BasicIO):
-    """Basic BoundingBox input/output class
-    """
-
-    def __init__(self, crss=None, dimensions=2, **kwargs):
-        super().__init__(**kwargs)
-
-        self._data = None
-        self.crss = crss or ['epsg:4326']
-        self.crs = self.crss[0]
-        self.dimensions = dimensions
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, value):
-        if isinstance(value, list):
-            self._data = [float(number) for number in value]
-        elif isinstance(value, str):
-            self._data = [float(number) for number in value.split(',')[:4]]
-        else:
-            self._data = None
-
-    @property
-    def ll(self):
-        if self.data:
-            return self.data[:2]
-        return []
-
-    @property
-    def ur(self):
-        if self.data:
-            return self.data[2:]
-        return []
-
-
-class LiteralInput(BasicLiteral):
-    """LiteralInput input abstract class
-    """
-
-    def __init__(self, allowed_values=None,
-                 default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
-
-        BasicLiteral.__init__(self, **kwargs)
-
-        if default_type != SOURCE_TYPE.DATA:
-            raise InvalidParameterValue("Source types other than data are not supported.")
-
-        self.any_value = False
-        self.values_reference = None
-        self.allowed_values = []
-
-        if allowed_values:
-            if not isinstance(allowed_values, (tuple, list)):
-                allowed_values = [allowed_values]
-            self.any_value = any(is_anyvalue(a) for a in allowed_values)
-            for value in allowed_values:
-                if is_values_reference(value):
-                    self.values_reference = value
-                    break
-            self.allowed_values = make_allowedvalues(allowed_values)
-
-        self._default = default
-        self._default_type = default_type
-
-        if default is not None:
-            self.data = default
-
-    @property
-    def validator(self):
-        """Get validator for any value as well as allowed_values
-        :rtype: function
-        """
-
-        if self.any_value:
-            return validate_anyvalue
-        elif self.values_reference:
-            return validate_values_reference
-        elif self.allowed_values:
-            return validate_allowed_values
-        else:
-            return validate_value
-
-
-class LiteralOutput(BasicLiteral):
-    """Basic LiteralOutput class
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self._storage = None
-
-    @property
-    def storage(self):
-        return self._storage
-
-    @storage.setter
-    def storage(self, storage):
-        self._storage = storage
-
-    @property
-    def validator(self):
-        """Get validator for any value as well as allowed_values
-        """
-
-        return validate_anyvalue
-
-
-class BBoxInput(BasicBoundingBox):
-    """Basic Bounding box input abstract class
-    """
-
-    def __init__(self, default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
-
-        super().__init__(**kwargs)
-
-        if default_type != SOURCE_TYPE.DATA:
-            raise InvalidParameterValue("Source types other than data are not supported.")
-
-        self._default = default
-        self._default_type = default_type
-
-        self._set_default_value(default, default_type)
-
-
-class BBoxOutput(BasicBoundingBox):
-    """Basic BoundingBox output class
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._storage = None
-
-    @property
-    def storage(self):
-        return self._storage
-
-    @storage.setter
-    def storage(self, storage):
-        self._storage = storage
-
-
-class ComplexInput(BasicComplex):
-    """Complex input abstract class
-
-    >>> ci = ComplexInput()
-    >>> ci.validator = 1
-    >>> ci.validator
-    1
-    """
-
-    def __init__(self, default=None, default_type=SOURCE_TYPE.DATA, **kwargs):
-        super().__init__(**kwargs)
-
-        self._default = default
-        self._default_type = default_type
-
-    def file_handler(self, inpt):
-        """<wps:Reference /> handler.
-        Used when href is a file url."""
-        # check if file url is allowed
-        self._validate_file_input(href=inpt.get('href'))
-        # save the file reference input in workdir
-        tmp_file = self._build_file_name(href=inpt.get('href'))
-
-        try:
-            inpt_file = urlparse(inpt.get('href')).path
-            inpt_file = os.path.abspath(inpt_file)
-            os.symlink(inpt_file, tmp_file)
-            LOGGER.debug("Linked input file {} to {}.".format(inpt_file, tmp_file))
-        except Exception:
-            # TODO: handle os.symlink on windows
-            # raise NoApplicableCode("Could not link file reference: {}".format(e))
-            LOGGER.warning("Could not link file reference")
-            shutil.copy2(inpt_file, tmp_file)
-
-        print(f"XXXX {tmp_file}")
-        return tmp_file
-
-    def url_handler(self, inpt):
-        # That could possibly go into the data property...
-        if inpt.get('method') == 'POST':
-            if 'body' in inpt:
-                self.post_data = inpt.get('body')
-            elif 'bodyreference' in inpt:
-                self.post_data = requests.get(url=inpt.get('bodyreference')).text
-            else:
-                raise AttributeError("Missing post data content.")
-
-        return inpt.get('href')
-
-    def process(self, inpt):
-        """Subclass with the appropriate handler given the data input."""
-        href = inpt.get('href', None)
-        self.inpt = inpt
-
-        if href:
-            if urlparse(href).scheme == 'file':
-                self.file = self.file_handler(inpt)
-
-            else:
-                # No file download occurs here. The file content will
-                # only be retrieved when the file property is accessed.
-                self.url = self.url_handler(inpt)
-
-        else:
-            self.data = inpt.get('data')
-
-    @staticmethod
-    def _validate_file_input(href):
-        href = href or ''
-        parsed_url = urlparse(href)
-        if parsed_url.scheme != 'file':
-            raise FileURLNotSupported('Invalid URL scheme')
-        file_path = parsed_url.path
-        if not file_path:
-            raise FileURLNotSupported('Invalid URL path')
-        file_path = os.path.abspath(file_path)
-        # build allowed paths list
-        inputpaths = config.get_config_value('server', 'allowedinputpaths')
-        allowed_paths = [os.path.abspath(p.strip()) for p in inputpaths.split(os.pathsep) if p.strip()]
-        for allowed_path in allowed_paths:
-            if file_path.startswith(allowed_path):
-                LOGGER.debug("Accepted file url as input.")
-                return
-        raise FileURLNotSupported()
-
-
-class ComplexOutput(BasicComplex):
-    """Complex output abstract class
-
-    >>> # temporary configuration
-    >>> import ConfigParser
-    >>> from pywps.storage import *
-    >>> config = ConfigParser.RawConfigParser()
-    >>> config.add_section('FileStorage')
-    >>> config.set('FileStorage', 'target', './')
-    >>> config.add_section('server')
-    >>> config.set('server', 'outputurl', 'http://foo/bar/filestorage')
-    >>>
-    >>> # create temporary file
-    >>> tiff_file = open('file.tiff', 'w')
-    >>> tiff_file.write("AA")
-    >>> tiff_file.close()
-    >>>
-    >>> co = ComplexOutput()
-    >>> co.file ='file.tiff'
-    >>> fs = FileStorage(config)
-    >>> co.storage = fs
-    >>>
-    >>> url = co.url # get url, data are stored
-    >>>
-    >>> co.stream.read() # get data - nothing is stored
-    'AA'
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self._storage = None
-
-    @property
-    def storage(self):
-        return self._storage
-
-    @storage.setter
-    def storage(self, storage):
-        # don't set storage twice
-        if self._storage is None:
-            self._storage = storage
-
-    # Ensure the storage of handled data to be able to expose it to with url
-    def ensure_storage(self):
-        print(f"Try store {self.identifier}")
-        # No data where provided
-        if self.stream is None:
-            return
-
-        if self._storage is None:
-            self._storage = new_storage()
-
-        # Copy data to the storage
-        with self.stream as fi:
-            # TODO: sanitise self.stream to always provide a binary stream.
-            encoding = None
-            if isinstance(fi, io.StringIO):
-                encoding = "utf-8"
-            with self._storage.open("w", encoding) as fo:
-                s = fi.read(4096)
-                while len(s) > 0:
-                    fo.write(s)
-                    s = fi.read(4096)
-                # TODO: For now the __exit__ is not implemented properly
-
-    # Give to the data store an url
-    def export(self):
-        return self._storage.export(self.identifier + self.data_format.extension, self.data_format.mime_type)

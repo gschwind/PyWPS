@@ -90,8 +90,8 @@ OGCUNIT = {
 
 from pywps.app import Process, Service, WPSRequest
 from pywps.app.WPSRequest import get_inputs_from_xml, get_output_from_xml
-from pywps.inout.inputs import LiteralInput, ComplexInput, BoundingBoxInput
-from pywps.inout.outputs import LiteralOutput, ComplexOutput, BoundingBoxOutput
+from pywps.inout.spec import LiteralInput, ComplexInput, BoundingBoxInput
+from pywps.inout.spec import LiteralOutput, ComplexOutput, BoundingBoxOutput
 from pywps.inout.formats import Format, FORMATS, get_format
 from pywps.inout import UOM
 

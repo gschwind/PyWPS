@@ -8,7 +8,7 @@ from pywps.exceptions import MissingParameterValue
 from pywps.exceptions import InvalidParameterValue
 from .basic import WPSResponse
 from pywps import __version__
-import os
+import os, sys
 
 
 class DescribeResponse(WPSResponse):
@@ -69,6 +69,14 @@ class DescribeResponse(WPSResponse):
             doc, content_type = self.get_response_doc()
             return make_response(doc, content_type=content_type)
         except NoApplicableCode as e:
+            import traceback
+            print("-" * 60)
+            traceback.print_exc(file=sys.stdout)
+            print("-" * 60)
             return e
         except Exception as e:
+            import traceback
+            print("-" * 60)
+            traceback.print_exc(file=sys.stdout)
+            print("-" * 60)
             return NoApplicableCode(str(e))

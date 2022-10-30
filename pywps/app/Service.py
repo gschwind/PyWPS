@@ -257,105 +257,22 @@ class Service(object):
         """Parse input data for the given process and update wps_request accordingly
         """
         LOGGER.debug('Checking if all mandatory inputs have been passed')
-        data_inputs = {}
-        for inpt in process.inputs:
+        inputs = dict()
+        for i in process.inputs:
             # Replace the dicts with the dict of Literal/Complex inputs
             # set the input to the type defined in the process.
-
-            request_inputs = wps_request.inputs.get(inpt.identifier, None)
-
-            if request_inputs is None:
-                if inpt._default is not None:
-                    if not inpt.data_set and isinstance(inpt, ComplexInput):
-                        inpt._set_default_value()
-                    data_inputs[inpt.identifier] = [inpt.clone()]
-            else:
-                if isinstance(inpt, ComplexInput):
-                    data_inputs[inpt.identifier] = Service.create_complex_inputs(inpt, request_inputs)
-                elif isinstance(inpt, LiteralInput):
-                    data_inputs[inpt.identifier] = Service.create_literal_inputs(inpt, request_inputs)
-                elif isinstance(inpt, BoundingBoxInput):
-                    data_inputs[inpt.identifier] = Service.create_bbox_inputs(inpt, request_inputs)
+            request_inputs = wps_request.inputs.get(i.identifier, None)
+            inputs[i.identifier] = i.create(request_inputs)
 
         # Check for missing inputs
-        for inpt in process.inputs:
-            if inpt.min_occurs > 0 and inpt.identifier not in data_inputs:
-                LOGGER.error('Missing parameter value: {}'.format(inpt.identifier))
-                raise MissingParameterValue(inpt.identifier, inpt.identifier)
+        for i in process.inputs:
+            if i.min_occurs > 0 and i.identifier not in inputs:
+                LOGGER.error('Missing parameter value: {}'.format(i.identifier))
+                raise MissingParameterValue(i.identifier, i.identifier)
 
-        wps_request.inputs = data_inputs
+        wps_request.inputs = inputs
 
         return wps_request
-
-    @staticmethod
-    def create_complex_inputs(source, inputs):
-        """Create new ComplexInput as clone of original ComplexInput
-        because of inputs can be more than one, take it just as Prototype.
-
-        :param source: The process's input definition.
-        :param inputs: The request input data.
-        :return collections.deque:
-        """
-
-        outinputs = deque(maxlen=source.max_occurs)
-
-        for inpt in inputs:
-            data_input = source.clone()
-            frmt = data_input.supported_formats[0]
-            if 'mimeType' in inpt:
-                if inpt['mimeType']:
-                    frmt = data_input.get_format(inpt['mimeType'])
-                else:
-                    frmt = data_input.data_format
-
-            if frmt:
-                data_input.data_format = frmt
-            else:
-                raise InvalidParameterValue(
-                    'Invalid mimeType value {} for input {}'.format(inpt.get('mimeType'), source.identifier),
-                    'mimeType')
-
-            data_input.method = inpt.get('method', 'GET')
-            data_input.process(inpt)
-            outinputs.append(data_input)
-
-        if len(outinputs) < source.min_occurs:
-            description = "At least {} inputs are required. You provided {}.".format(
-                source.min_occurs,
-                len(outinputs),
-            )
-            raise MissingParameterValue(description=description, locator=source.identifier)
-        return outinputs
-
-    @staticmethod
-    def create_literal_inputs(source, inputs):
-        """ Takes the http_request and parses the input to objects
-        :return collections.deque:
-        """
-
-        outinputs = deque(maxlen=source.max_occurs)
-
-        for inpt in inputs:
-            newinpt = source.clone()
-            # set the input to the type defined in the process
-            newinpt.uom = inpt.get('uom')
-            data_type = inpt.get('datatype')
-            if data_type:
-                newinpt.data_type = data_type
-
-            # get the value of the field
-            newinpt.data = inpt.get('data')
-
-            outinputs.append(newinpt)
-
-        if len(outinputs) < source.min_occurs:
-            description = "At least {} inputs are required. You provided {}.".format(
-                source.min_occurs,
-                len(outinputs),
-            )
-            raise MissingParameterValue(description, locator=source.identifier)
-
-        return outinputs
 
     def _set_grass(self):
         """Set environment variables needed for GRASS GIS support
@@ -382,31 +299,6 @@ class Service(object):
                                                       python_path)
             os.putenv('PYTHONPATH', os.environ.get('PYTHONPATH'))
             sys.path.insert(0, python_path)
-
-    @staticmethod
-    def create_bbox_inputs(source, inputs):
-        """ Takes the http_request and parses the input to objects
-        :return collections.deque:
-        """
-
-        outinputs = deque(maxlen=source.max_occurs)
-
-        for inpt in inputs:
-            newinpt = source.clone()
-            newinpt.data = inpt.get('data')
-            LOGGER.debug(f'newinpt bbox data={newinpt.data}')
-            newinpt.crs = inpt.get('crs')
-            newinpt.dimensions = inpt.get('dimensions')
-            outinputs.append(newinpt)
-
-        if len(outinputs) < source.min_occurs:
-            description = "At least {} inputs are required. You provided {}.".format(
-                source.min_occurs,
-                len(outinputs),
-            )
-            raise MissingParameterValue(description=description, locator=source.identifier)
-
-        return outinputs
 
     @staticmethod
     def _process_files(http_request):

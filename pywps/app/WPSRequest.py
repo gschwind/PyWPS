@@ -540,6 +540,7 @@ def get_inputs_from_xml(doc):
         if literal_data:
             value_el = literal_data[0]
             inpt = {}
+            inpt['type'] = 'literal'
             inpt['identifier'] = identifier_el.text
             inpt['data'] = str(value_el.text)
             inpt['uom'] = value_el.attrib.get('uom', '')
@@ -551,6 +552,7 @@ def get_inputs_from_xml(doc):
         if complex_data:
             complex_data_el = complex_data[0]
             inpt = {}
+            inpt['type'] = 'complex'
             inpt['identifier'] = identifier_el.text
             inpt['mimeType'] = complex_data_el.attrib.get('mimeType', None)
             inpt['encoding'] = complex_data_el.attrib.get('encoding', '').lower()
@@ -569,6 +571,7 @@ def get_inputs_from_xml(doc):
         if reference_data:
             reference_data_el = reference_data[0]
             inpt = {}
+            inpt['type'] = 'reference'
             inpt['identifier'] = identifier_el.text
             inpt[identifier_el.text] = reference_data_el.text
             inpt['href'] = reference_data_el.attrib.get(
@@ -598,6 +601,7 @@ def get_inputs_from_xml(doc):
                 LOGGER.debug("parse bbox: minx={}, miny={}, maxx={},maxy={}".format(
                     bbox.minx, bbox.miny, bbox.maxx, bbox.maxy))
                 inpt = {}
+                inpt['type'] = 'bbox'
                 inpt['identifier'] = identifier_el.text
                 inpt['data'] = [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
                 inpt['crs'] = bbox.crs.getcodeurn() if bbox.crs else None
@@ -651,11 +655,13 @@ def get_inputs_from_json(jdoc):
             data_type = inpt_def.get('type', 'literal')
             inpt = {'identifier': identifier}
             if data_type == 'literal':
+                inpt['type'] = 'literal'
                 inpt['data'] = inpt_def.get('data')
                 inpt['uom'] = inpt_def.get('uom', '')
                 inpt['datatype'] = inpt_def.get('datatype', '')
                 the_inputs[identifier].append(inpt)
             elif data_type == 'complex':
+                inpt['type'] = 'complex'
                 inpt['mimeType'] = inpt_def.get('mimeType', None)
                 inpt['encoding'] = inpt_def.get('encoding', '').lower()
                 inpt['schema'] = inpt_def.get('schema', '')
@@ -664,6 +670,7 @@ def get_inputs_from_json(jdoc):
                 the_inputs[identifier].append(inpt)
             elif data_type == 'reference':
                 inpt[identifier] = inpt_def
+                inpt['type'] = 'reference'
                 inpt['href'] = inpt_def.get('href', '')
                 inpt['mimeType'] = inpt_def.get('mimeType', None)
                 inpt['method'] = inpt_def.get('method', 'GET')
@@ -672,6 +679,7 @@ def get_inputs_from_json(jdoc):
                 inpt['bodyreference'] = inpt_def.get('bodyreference', '')
                 the_inputs[identifier].append(inpt)
             elif data_type == 'bbox':
+                inpt['type'] = 'bbox'
                 inpt['data'] = inpt_def['bbox']
                 inpt['crs'] = inpt_def.get('crs', 'urn:ogc:def:crs:EPSG::4326')
                 inpt['dimensions'] = inpt_def.get('dimensions', 2)

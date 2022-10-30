@@ -210,8 +210,8 @@ class WPSRequest(object):
             wpsrequest.status = _get_get_param(http_request, 'status', 'false')
             wpsrequest.lineage = _get_get_param(
                 http_request, 'lineage', 'false')
-            wpsrequest.inputs = get_data_from_kvp(
-                _get_get_param(http_request, 'DataInputs'), 'DataInputs')
+            wpsrequest.inputs = get_input_from_kvp(
+                _get_get_param(http_request, 'DataInputs'))
             if self.inputs is None:
                 self.inputs = {}
 
@@ -225,7 +225,7 @@ class WPSRequest(object):
                 wpsrequest.raw = wpsrequest.output_ids is not None
 
             wpsrequest.default_mimetype = _get_get_param(http_request, 'f', wpsrequest.default_mimetype)
-            wpsrequest.outputs = get_data_from_kvp(wpsrequest.output_ids) or {}
+            wpsrequest.outputs = get_output_from_kvp(wpsrequest.output_ids) or {}
             if wpsrequest.raw:
                 # executeResponse XML will not be stored and no updating of
                 # status
@@ -712,49 +712,55 @@ def get_output_from_dict(output_ids, raw):
     return raw, the_output
 
 
-def get_data_from_kvp(data, part=None):
-    """Get execute DataInputs and ResponseDocument from URL (key-value-pairs) encoding
-    :param data: key:value pair list of the datainputs and responseDocument parameter
-    :param part: DataInputs or similar part of input url
-    """
+def parse_kvp_entry(e : str):
+    fields = e.split('@')
 
-    the_data = {}
+    # First field is identifier and its value
+    identifier, val = fields[0].split("=", 1)
+    io = {
+        'identifier': identifier,
+        'data': unquote(val)
+    }
 
-    if data is None:
-        return None
+    io.update({
+        k : unquote(v) for k, v in [a.split("=", 1) for a in fields[1:]]
+    })
 
+    # Workaround for unexpectect case. Spec does not allow 'xlink:href'
+    if 'xlink:href' in io:
+        io['href'] = io['xlink:href']
+        del io['xlink:href']
+
+    return io
+
+
+# Read KVP into python dictionnary
+def get_data_from_kvp(data):
+    o = list()
     for d in data.split(";"):
         try:
-            io = {}
-            fields = d.split('@')
-
-            # First field is identifier and its value
-            (identifier, val) = fields[0].split("=")
-            io['identifier'] = identifier
-            io['data'] = unquote(val)
-
-            # Get the attributes of the data
-            for attr in fields[1:]:
-                (attribute, attr_val) = attr.split('=', 1)
-                if attribute == 'xlink:href':
-                    io['href'] = unquote(attr_val)
-                else:
-                    io[attribute] = unquote(attr_val)
-
-            # Add the input/output with all its attributes and values to the
-            # dictionary
-            if part == 'DataInputs':
-                if identifier not in the_data:
-                    the_data[identifier] = []
-                the_data[identifier].append(io)
-            else:
-                the_data[identifier] = io
+            o.append(parse_kvp_entry(d))
         except Exception as e:
+            LOGGER.warning(f"Invalid KVP entry: {d}")
             LOGGER.warning(e)
-            the_data[d] = {'identifier': d, 'data': ''}
+    return o
 
-    return the_data
 
+# Read KVP into python dictionnary
+def get_input_from_kvp(data : str):
+    """Get execute DataInputs and ResponseDocument from URL (key-value-pairs) encoding
+    :param data: key:value pair list of the datainputs and responseDocument parameter
+    """
+    d = dict()
+    for e in get_data_from_kvp(data):
+        d.get(e['identifier'], list()).append(e)
+    return d
+
+def get_output_from_kvp(data : str):
+    d = dict()
+    for e in get_data_from_kvp(data):
+        d[e['identifier']] = e
+    return d
 
 def _check_version(version):
     """ check given version

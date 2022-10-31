@@ -244,7 +244,7 @@ def convert_float(inpt):
     return float(inpt)
 
 
-@register_convert_type('interger')
+@register_convert_type('integer')
 def convert_integer(inpt):
     """Return integer value from input inpt
 

@@ -114,7 +114,7 @@ class BasicLiteral(BasicIO):
     """Basic literal Input/Output class
     """
 
-    def __init__(self, *args, data_type='string', uoms=None, **kwargs):
+    def __init__(self, *args, data_type='string', uoms=None, mode=None, **kwargs):
         assert data_type in LITERAL_DATA_TYPES
 
         super().__init__(*args, **kwargs)
@@ -259,12 +259,10 @@ class BasicBoundingBox(BasicIO):
     """Basic BoundingBox input/output class
     """
 
-    def __init__(self, *args, crss=None, dimensions=2, **kwargs):
+    def __init__(self, *args, crss=None, dimensions=2, mode=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._data = None
         self.crss = crss or ['epsg:4326']
-        self.crs = self.crss[0]
         self.dimensions = dimensions
 
     def as_json(self):
@@ -272,38 +270,12 @@ class BasicBoundingBox(BasicIO):
         data.update({
             'type': 'bbox',
             'bbox': self.data,
-            'crs': self.crs,
             'crss': self.crss,
-            'll': self.ll,
-            'ur': self.ur,
             'dimensions': self.dimensions
         })
         return data
 
-    @property
-    def data(self):
-        return self._data
 
-    @data.setter
-    def data(self, value):
-        if isinstance(value, list):
-            self._data = [float(number) for number in value]
-        elif isinstance(value, str):
-            self._data = [float(number) for number in value.split(',')[:4]]
-        else:
-            self._data = None
-
-    @property
-    def ll(self):
-        if self.data:
-            return self.data[:2]
-        return []
-
-    @property
-    def ur(self):
-        if self.data:
-            return self.data[2:]
-        return []
 
 
 class LiteralInput(BasicLiteral):
@@ -441,7 +413,24 @@ class BoundingBoxOutput(BasicBoundingBox):
 
 
 class ComplexInput(BasicComplex):
-    """Complex input abstract class
+    """
+    Store specification of ComplexInput [Public API]
+
+    :param str identifier: The name of this input.
+    :param str title: Title of the input
+    :param pywps.inout.formats.Format supported_formats: List of supported
+                                                          formats
+    :param pywps.inout.formats.Format data_format: default data format
+    :param str abstract: Input abstract
+    :param list keywords: Keywords that characterize this input.
+    :param str workdir: working directory, to save temporary file objects in.
+    :param list metadata: TODO
+    :param int min_occurs: minimum occurrence
+    :param int max_occurs: maximum occurrence
+    :param pywps.validator.mode.MODE mode: validation mode (none to strict)
+    :param dict[str,dict[str,str]] translations: The first key is the RFC 4646 language code,
+        and the nested mapping contains translated strings accessible by a string property.
+        e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
 
     >>> ci = ComplexInput()
     >>> ci.validator = 1
@@ -454,40 +443,6 @@ class ComplexInput(BasicComplex):
 
         self._default = default
         self._default_type = default_type
-
-    def file_handler(self, inpt):
-        """<wps:Reference /> handler.
-        Used when href is a file url."""
-        # check if file url is allowed
-        self._validate_file_input(href=inpt.get('href'))
-        # save the file reference input in workdir
-        tmp_file = self._build_file_name(href=inpt.get('href'))
-
-        try:
-            inpt_file = urlparse(inpt.get('href')).path
-            inpt_file = os.path.abspath(inpt_file)
-            os.symlink(inpt_file, tmp_file)
-            LOGGER.debug("Linked input file {} to {}.".format(inpt_file, tmp_file))
-        except Exception:
-            # TODO: handle os.symlink on windows
-            # raise NoApplicableCode("Could not link file reference: {}".format(e))
-            LOGGER.warning("Could not link file reference")
-            shutil.copy2(inpt_file, tmp_file)
-
-        print(f"XXXX {tmp_file}")
-        return tmp_file
-
-    def url_handler(self, inpt):
-        # That could possibly go into the data property...
-        if inpt.get('method') == 'POST':
-            if 'body' in inpt:
-                self.post_data = inpt.get('body')
-            elif 'bodyreference' in inpt:
-                self.post_data = requests.get(url=inpt.get('bodyreference')).text
-            else:
-                raise AttributeError("Missing post data content.")
-
-        return inpt.get('href')
 
     @staticmethod
     def _validate_file_input(href):

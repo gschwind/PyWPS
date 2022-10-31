@@ -524,7 +524,7 @@ class WPSRequest(object):
                     LOGGER.warning(f'skipping input: {identifier}')
                     pass
 
-
+# convert XML inputs into python dictionary
 def get_inputs_from_xml(doc):
     the_inputs = {}
     version = get_version_from_ns(doc.nsmap[doc.prefix])
@@ -848,3 +848,5 @@ def _get_reference_bodyreference(referencebody_element):
     """
     return referencebody_element.attrib.get(
         '{http://www.w3.org/1999/xlink}href', '')
+
+

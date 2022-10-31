@@ -31,6 +31,7 @@ from copy import deepcopy
 from io import BytesIO
 import humanize
 
+from urllib.request import urlopen, Request
 import weakref
 
 
@@ -347,6 +348,18 @@ class IOHandler(object):
         self._iohandler = UrlHandler(value, self)
         self._check_valid()
 
+
+    @property
+    def url2(self):
+        """Return the url of data"""
+        return self._iohandler._url
+
+
+    @url.setter
+    def url2(self, value):
+        self._iohandler = Url2Handler(value, self)
+        self._check_valid()
+
     # FIXME: post_data is only related to url, this should be initialize with url setter
     @property
     def post_data(self):
@@ -621,6 +634,114 @@ class UrlHandler(FileHandler):
             req = requests.get(url=href, stream=True)
 
         return req
+
+    @staticmethod
+    def max_size():
+        """Calculates maximal size for input file based on configuration
+        and units.
+
+        :return: maximum file size in bytes
+        """
+        ms = config.get_config_value('server', 'maxsingleinputsize')
+        byte_size = config.get_size_mb(ms) * 1024**2
+        return byte_size
+
+
+
+class Url2Handler(FileHandler):
+    prop = 'url'
+
+    # :param value a dictionary containing following keys:
+    #    ['href', 'method', 'header', 'body', 'bodyreference']
+    def __init__(self, value, ref):
+        self._ref = weakref.ref(ref)
+        self._file = None
+        self._data = None
+        self._stream = None
+        self._url = value
+        self._post_data = None
+
+    @property
+    def url(self):
+        """Return the URL."""
+        return self._url
+
+    @property
+    def file(self):
+        """Downloads URL and return file pointer.
+        Checks if size is allowed before download.
+        """
+        if self._file is not None:
+            return self._file
+
+        self._file = self._ref()._build_file_name(href=self.url['href'])
+
+        max_byte_size = self.max_size()
+
+        # Create request
+        try:
+
+            method = self.url.get('method', 'GET')
+
+            headers = dict()
+            if self.url.get('header', None) is not None:
+                headers = Url2Handler._parse_header(self.url['header'])
+
+            body = None
+            if method == 'POST':
+                if self.url.get('bodyreference', None) is not None:
+                    body = urlopen(self.url['bodyreference'].lstrip().rstrip()).read()
+                elif self.url.get('body', None) is not None:
+                    body = self.url['body'].encode("utf-8")
+
+            reference_file = urlopen(Request(self.url['href'], data=body, headers=headers, method=method))
+            data_size = reference_file.headers.get('Content-Length', 0)
+        except Exception as e:
+            raise NoApplicableCode('File reference error: {}'.format(e))
+
+        error_message = 'File size for input "{}" exceeded. Maximum allowed: {}'.format(
+            self._ref().inpt.get('identifier', '?'), humanize.naturalsize(max_byte_size))
+
+        if int(max_byte_size) > 0:
+            if int(data_size) > int(max_byte_size):
+                raise FileSizeExceeded(error_message)
+
+        try:
+            with open(self._file, 'wb') as f:
+                data_size = 0
+                for chunk in reference_file.iter_content(chunk_size=1024):
+                    data_size += len(chunk)
+                    if int(max_byte_size) > 0:
+                        if int(data_size) > int(max_byte_size):
+                            raise FileSizeExceeded(error_message)
+                    f.write(chunk)
+        except FileSizeExceeded:
+            raise
+        except Exception as e:
+            raise NoApplicableCode(e)
+
+        return self._file
+
+    @staticmethod
+    def _parse_header(self, s):
+        o = dict()
+        for l in s.splitlines():
+            x = l.split(':')
+            if len(x) != 2:
+                continue
+            o[x[0]] = x[1]
+        return o
+
+
+    @property
+    def size(self):
+        """Get content-length of URL without download"""
+        req = self._openurl(self.url)
+        if req.ok:
+            size = int(req.headers.get('content-length', '0'))
+        else:
+            size = 0
+        return size
 
     @staticmethod
     def max_size():

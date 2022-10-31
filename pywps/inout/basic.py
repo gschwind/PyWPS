@@ -19,7 +19,7 @@ import requests
 import tempfile
 import logging
 import pywps.configuration as config
-
+from pywps import OGCUNIT
 from pywps.validator.mode import MODE
 
 from pywps.exceptions import NoApplicableCode, InvalidParameterValue, FileSizeExceeded, \
@@ -54,6 +54,27 @@ def _is_textfile(filename):
         is_text = b'\x00' not in fh.read(blocksize)
         fh.close()
     return is_text
+
+
+class UOM(object):
+    """
+    :param uom: unit of measure
+    """
+
+    def __init__(self, uom='', reference=None):
+        self.uom = uom
+        self.reference = reference
+
+        if self.reference is None:
+            self.reference = OGCUNIT[self.uom]
+
+    @property
+    def json(self):
+        return {"reference": self.reference,
+                "uom": self.uom}
+
+    def __eq__(self, other):
+        return self.uom == other.uom
 
 
 class NoneIOHandler(object):
@@ -273,11 +294,6 @@ class IOHandler(object):
         else:
             return ''
 
-    def clone(self):
-        """Create copy of yourself
-        """
-        return deepcopy(self)
-
     @property
     def base64(self):
         """Return raw data
@@ -321,7 +337,6 @@ class IOHandler(object):
 
     @data.setter
     def data(self, value):
-        print(f"Create DataHandler {value}")
         self._iohandler = DataHandler(value, self)
         self._check_valid()
 
@@ -333,7 +348,6 @@ class IOHandler(object):
 
     @stream.setter
     def stream(self, value):
-        print(f"Create StreamHandler {value}")
         self._iohandler = StreamHandler(value, self)
         self._check_valid()
 

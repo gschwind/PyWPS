@@ -15,6 +15,8 @@ from copy import deepcopy
 from pywps.validator.mode import MODE
 from pywps.inout.literaltypes import AnyValue, NoValue, ValuesReference, AllowedValue
 
+from .basic import UOM
+
 CDATA_PATTERN = re.compile(r'<!\[CDATA\[(.*?)\]\]>')
 
 LOGGER = logging.getLogger("PYWPS")
@@ -52,6 +54,7 @@ class BoundingBoxInput(basic.IOHandler):
             'identifier': self.spec.identifier,
             'title': self.spec.title,
             'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
 
             # Required for serialization
             'type': BoundingBoxInput.type,
@@ -154,6 +157,7 @@ class ComplexInput(basic.IOHandler):
             'identifier': self.spec.identifier,
             'title': self.spec.title,
             'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
 
             # Required for serialization
             'type': ComplexInput.type,
@@ -169,30 +173,6 @@ class ComplexInput(basic.IOHandler):
         raise NotImplementedError("Use ComplexInput.__init__ instead")
 
 
-    # def file_handler(self, inpt):
-    #     """<wps:Reference /> handler.
-    #     Used when href is a file url."""
-    #     # check if file url is allowed
-    #     self._validate_file_input(href=inpt.get('href'))
-    #     # save the file reference input in workdir
-    #     tmp_file = self._build_file_name(href=inpt.get('href'))
-    #
-    #     try:
-    #         inpt_file = urlparse(inpt.get('href')).path
-    #         inpt_file = os.path.abspath(inpt_file)
-    #         os.symlink(inpt_file, tmp_file)
-    #         LOGGER.debug("Linked input file {} to {}.".format(inpt_file, tmp_file))
-    #     except Exception:
-    #         # TODO: handle os.symlink on windows
-    #         # raise NoApplicableCode("Could not link file reference: {}".format(e))
-    #         LOGGER.warning("Could not link file reference")
-    #         shutil.copy2(inpt_file, tmp_file)
-    #
-    #     print(f"XXXX {tmp_file}")
-    #     return tmp_file
-
-
-
 class LiteralInput(basic.IOHandler):
     type = 'literal'
 
@@ -202,8 +182,17 @@ class LiteralInput(basic.IOHandler):
 
         self.workdir = self.workdir or json.get('workdir', None)
 
-        # FIXME: uom serialization
-        self.uom = json.get('uom', self.spec.uoms[0].uom)
+        # TODO: check datatype
+
+        default_uom = None
+        if self.spec.uoms is not None and len(self.spec.uoms) > 0:
+            default_uom = self.spec.uoms[0]
+        self.uom = json.get('uom', default_uom)
+        if isinstance(self.uom, str):
+            self.uom = UOM(self.uom)
+        elif isinstance(self.uom, dict):
+            self.uom = UOM(self.uom['uom'], self.uom['reference'])
+
         self.data_type = json.get('datatype', None)
 
         self.src_data = json['data']
@@ -221,13 +210,14 @@ class LiteralInput(basic.IOHandler):
 
         return {
             # Required for lineage=True
-            'uom': self.uom,
+            'uom': None if self.uom is None else self.uom.json,
             'datatype': self.data_type,
             'data': self.src_data,
 
             'identifier': self.spec.identifier,
             'title': self.spec.title,
             'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
 
             # Required for serialization
             'type': LiteralInput.type,
@@ -292,42 +282,18 @@ class ReferenceInput(basic.IOHandler):
     def from_json(cls, json_input):
         raise NotImplementedError("Use ReferenceInput.__init__ instead")
 
-    # This is for the outputs
-    # def _json_data(self, data):
-    #     """Return Data node
-    #     """
-    #
-    #     if self.data:
-    #
-    #         if self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
-    #             # Note that in a client-server round trip, the original and returned file will not be identical.
-    #             data_doc = etree.parse(self.file)
-    #             data["data"] = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
-    #
-    #         else:
-    #             if self.data_format.encoding == 'base64':
-    #                 data["data"] = self.base64.decode('utf-8')
-    #
-    #             else:
-    #                 # Otherwise we assume all other formats are unsafe and need to be enclosed in a CDATA tag.
-    #                 if isinstance(self.data, bytes):
-    #                     out = self.data.decode(self.data_format.encoding or 'utf-8')
-    #                 else:
-    #                     out = self.data
-    #
-    #                 data["data"] = '<![CDATA[{}]]>'.format(out)
-    #
-    #     return data
 
-
+# FIXME: Broken
 def input_from_json(json_data):
     data_type = json_data.get('type', 'literal')
-    if data_type in ['complex', 'reference']:
+    if data_type in 'complex':
         inpt = ComplexInput.from_json(json_data)
     elif data_type == 'literal':
         inpt = LiteralInput.from_json(json_data)
     elif data_type == 'bbox':
         inpt = BoundingBoxInput.from_json(json_data)
+    elif data_type == 'reference':
+        inpt = ReferenceInput.from_json(json_data)
     else:
         raise InvalidParameterValue("Input type not recognized: {}".format(data_type))
     return inpt

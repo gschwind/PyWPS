@@ -5,6 +5,7 @@
 ##################################################################
 
 import logging
+import sys
 from collections import deque
 from . import inputs
 from pywps.exceptions import (StorageNotSupported, OperationNotSupported,
@@ -21,34 +22,18 @@ from pywps.translations import lower_case_dict
 from pywps.inout.literaltypes import (LITERAL_DATA_TYPES, convert,
                                       make_allowedvalues, is_anyvalue,
                                       is_values_reference)
+
 from pywps.validator.mode import MODE
 from collections import namedtuple
-from pywps import OGCUNIT
+
+from .basic import UOM
 
 _SOURCE_TYPE = namedtuple('SOURCE_TYPE', 'MEMORY, FILE, STREAM, DATA, URL')
 SOURCE_TYPE = _SOURCE_TYPE(0, 1, 2, 3, 4)
 
 LOGGER = logging.getLogger("PYWPS")
 
-class UOM(object):
-    """
-    :param uom: unit of measure
-    """
 
-    def __init__(self, uom='', reference=None):
-        self.uom = uom
-        self.reference = reference
-
-        if self.reference is None:
-            self.reference = OGCUNIT[self.uom]
-
-    @property
-    def json(self):
-        return {"reference": self.reference,
-                "uom": self.uom}
-
-    def __eq__(self, other):
-        return self.uom == other.uom
 
 
 class BasicIO:

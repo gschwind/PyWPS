@@ -61,6 +61,24 @@ class ProcessTestCase(unittest.TestCase):
         identifier = get_translation(self.process, "identifier", "fr-CA")
         assert identifier == self.process.identifier
 
+    def test_json_export_for_decribe_template(self):
+        # Check if json output has required attribute to apply decribe process template
+        o = self.process.json
+
+        self.assertTrue('identifier' in o)
+        self.assertTrue('title' in o)
+        self.assertTrue('abstract' in o)
+        self.assertTrue('translations' in o)
+        self.assertTrue('inputs' in o)
+        self.assertTrue('outputs' in o)
+        self.assertTrue('version' in o)
+        self.assertTrue('store_supported' in o)
+        self.assertTrue('status_supported' in o)
+
+        self.assertIsInstance(o['inputs'], list)
+        self.assertIsInstance(o['outputs'], list)
+
+
 def load_tests(loader=None, tests=None, pattern=None):
     """Load local tests
     """

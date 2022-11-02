@@ -254,7 +254,6 @@ class BasicBoundingBox(BasicIO):
         data = super().as_json()
         data.update({
             'type': 'bbox',
-            'bbox': self.data,
             'crss': self.crss,
             'dimensions': self.dimensions
         })

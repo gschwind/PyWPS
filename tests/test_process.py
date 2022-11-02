@@ -53,18 +53,6 @@ class ProcessTestCase(unittest.TestCase):
         self.assertEqual("BBox", inputs["bbox"])
         self.assertEqual("Vector", inputs["vector"])
 
-    def test_json(self):
-        new_process = Process.from_json(self.process.json)
-        self.assertEqual(new_process.identifier, self.process.identifier)
-        self.assertEqual(new_process.title, self.process.title)
-        self.assertEqual(len(new_process.inputs), len(self.process.inputs))
-        new_inputs = {
-            inpt.identifier: inpt.title for inpt in new_process.inputs
-        }
-        self.assertEqual("Length", new_inputs['length'])
-        self.assertEqual("BBox", new_inputs["bbox"])
-        self.assertEqual("Vector", new_inputs["vector"])
-
     def test_get_translations(self):
         title_fr = get_translation(self.process, "title", "fr-CA")
         assert title_fr == "Processus"

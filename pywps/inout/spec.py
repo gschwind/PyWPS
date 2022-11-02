@@ -349,6 +349,9 @@ class LiteralOutput(BasicLiteral):
     def as_json(self):
         return super().as_json()
 
+    def create(self, json):
+        return outputs.LiteralOuput(self, json)
+
 
 class BoundingBoxInput(BasicBoundingBox):
     """Basic Bounding box input abstract class
@@ -395,6 +398,9 @@ class BoundingBoxOutput(BasicBoundingBox):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def create(self, json):
+        return outputs.BounddingBoxOuput(self, json)
 
 
 class ComplexInput(BasicComplex):
@@ -497,3 +503,11 @@ class ComplexOutput(BasicComplex):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def create(self, json):
+        as_reference = False
+        if json.get('asReference', None) is not None:
+            as_reference = json['asReference']
+        if as_reference:
+            return outputs.ReferenceOutput(self, json)
+        else:
+            return outputs.ComplexOutput(self, json)

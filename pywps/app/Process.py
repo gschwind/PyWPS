@@ -398,34 +398,43 @@ class ProcessInstance(object):
                          dbase, location, os.path.basename(mapset_name)))
 
     def setup_outputs_from_wps_request(self, wps_request : WPSRequest, wps_response):
-        # set as_reference to True for all the outputs specified as reference
-        # if the output is not required to be raw
-        if not wps_request.raw:
-            for wps_outpt in wps_request.outputs:
 
-                is_reference = wps_request.outputs[wps_outpt].get('asReference', 'false')
-                mimetype = wps_request.outputs[wps_outpt].get('mimetype', '')
-                if not isinstance(mimetype, str):
-                    mimetype = ''
+        outputs = []
+        for o in self.outputs:
+            requested_outputs = wps_request.outputs.get(o.identifier, None)
+            if requested_outputs is None:
+                continue
+            outputs.append(o.create(json=requested_outputs))
 
-                if is_reference.lower() == 'true':
-                    # check if store is supported
-                    if self.store_supported == 'false':
-                        raise StorageNotSupported(
-                            'The storage of data is not supported for this process.')
 
-                    is_reference = True
-                else:
-                    is_reference = False
-
-                for outpt in self.outputs:
-                    if outpt.identifier == wps_outpt:
-                        o = outpt.clone()
-                        o.as_reference = is_reference
-                        if isinstance(o, ComplexOutput) and mimetype:
-                            data_format = [f for f in outpt.supported_formats if f.mime_type == mimetype]
-                            if len(data_format) == 0:
-                                raise InvalidParameterValue(
-                                    f"MimeType {mimetype} not valid")
-                            o.data_format = data_format[0]
-                        wps_response.outputs[o.identifier] = o
+        # # set as_reference to True for all the outputs specified as reference
+        # # if the output is not required to be raw
+        # if not wps_request.raw:
+        #     for wps_outpt in wps_request.outputs:
+        #
+        #         is_reference = wps_request.outputs[wps_outpt].get('asReference', 'false')
+        #         mimetype = wps_request.outputs[wps_outpt].get('mimetype', '')
+        #         if not isinstance(mimetype, str):
+        #             mimetype = ''
+        #
+        #         if is_reference.lower() == 'true':
+        #             # check if store is supported
+        #             if self.store_supported == 'false':
+        #                 raise StorageNotSupported(
+        #                     'The storage of data is not supported for this process.')
+        #
+        #             is_reference = True
+        #         else:
+        #             is_reference = False
+        #
+        #         for outpt in self.outputs:
+        #             if outpt.identifier == wps_outpt:
+        #                 o = outpt.clone()
+        #                 o.as_reference = is_reference
+        #                 if isinstance(o, ComplexOutput) and mimetype:
+        #                     data_format = [f for f in outpt.supported_formats if f.mime_type == mimetype]
+        #                     if len(data_format) == 0:
+        #                         raise InvalidParameterValue(
+        #                             f"MimeType {mimetype} not valid")
+        #                     o.data_format = data_format[0]
+        #                 wps_response.outputs[o.identifier] = o

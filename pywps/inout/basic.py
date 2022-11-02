@@ -807,3 +807,178 @@ class Url2Handler(FileHandler):
 #         IOHandler.data.fset(self, value)
 
 
+class StorageHandler(object):
+    """StorageHandler is crafted to hold ouputs. It store the output into the
+    storage, currently it's write only. The outputs has no workdir because they
+    use the storage.
+
+    :param spec the specification of the output
+    :param as_reference boolean that specify of the output will be inline or a reference
+
+    `file` : str
+      Filename on the local disk.
+    `url` : str
+      Link to an online resource.
+    `stream` : FileIO
+      A readable object.
+    `data` : object
+      A native python object (integer, string, float, etc)
+    `base64` : str
+      A base 64 encoding of the data.
+
+    >>> # setting up
+    >>> import os
+    >>> from io import RawIOBase
+    >>> from io import FileIO
+    >>>
+    >>> ioh_file = IOHandler(workdir=tmp)
+    >>> assert isinstance(ioh_file, IOHandler)
+    >>>
+    >>> # Create test file input
+    >>> fileobj = open(os.path.join(tmp, 'myfile.txt'), 'w')
+    >>> fileobj.write('ASDF ASFADSF ASF ASF ASDF ASFASF')
+    >>> fileobj.close()
+    >>>
+    >>> # testing file object on input
+    >>> ioh_file.file = fileobj.name
+    >>> assert ioh_file.file == fileobj.name
+    >>> assert isinstance(ioh_file.stream, RawIOBase)
+    >>> # skipped assert isinstance(ioh_file.memory_object, POSH)
+    >>>
+    >>> # testing stream object on input
+    >>> ioh_stream = IOHandler(workdir=tmp)
+    >>> assert ioh_stream.workdir == tmp
+    >>> ioh_stream.stream = FileIO(fileobj.name,'r')
+    >>> assert open(ioh_stream.file).read() == ioh_file.stream.read()
+    >>> assert isinstance(ioh_stream.stream, RawIOBase)
+    """
+
+    def __init__(self, spec, as_reference=False):
+
+        # Lazy creation of the storage
+        self._storage = None
+        # Read only
+        self._spec = spec
+
+        # TODO: Clarify intent
+        self.as_reference = as_reference
+
+
+    @property
+    def validator(self):
+        return self._spec.validator
+
+    @property
+    def spec(self):
+        return self._spec
+
+    @property
+    def source_type(self):
+        """Return the source type."""
+        # For backward compatibility only. source_type checks could be replaced by `isinstance`.
+        return getattr(SOURCE_TYPE, self.prop.upper())
+
+
+    def _build_file_name(self, href=''):
+        """Return a file name for the local system."""
+        url_path = urlparse(href).path or ''
+        file_name = os.path.basename(url_path).strip() or 'input'
+        (prefix, suffix) = os.path.splitext(file_name)
+        suffix = suffix or self.extension
+        if prefix and suffix:
+            file_name = prefix + suffix
+        input_file_name = os.path.join(self.workdir, file_name)
+
+        # build tempfile in case of duplicates
+        if os.path.exists(input_file_name):
+            input_file_name = tempfile.mkstemp(
+                suffix=suffix, prefix=prefix + '_',
+                dir=self.workdir)[1]
+        else:
+            open(file_name, "w")
+
+        return input_file_name
+
+    @property
+    def extension(self):
+        """Return the file extension for the data format, if set."""
+        if getattr(self, 'data_format', None):
+            return self.data_format.extension
+        else:
+            return ''
+
+    # Create the storage if not available yet
+    @property
+    def storage(self):
+        if self._storage is not None:
+            return self._storage
+        self._storage = new_storage()
+        return self._storage
+
+    @property
+    def base64(self):
+        raise NotImplementedError("StorageHandler.base64 is not available")
+
+    @base64.setter
+    def base64(self, value):
+        if isinstance(value, str):
+            value = value.encode("utf-8")
+        value = base64.b64decode(value)
+
+        with self.storage.open("w") as fo:
+            fo.write(value)
+
+    @property
+    def file(self):
+        raise NotImplementedError("StorageHandler.base64 is not available")
+
+    @file.setter
+    def file(self, value):
+        with self.storage.open("w") as fo, open(value, "rb") as fi:
+            while True:
+                buffer = fi.read(4096 * 64)
+                if len(buffer) == 0:
+                    break
+                fo.write(buffer)
+
+    @property
+    def data(self):
+        raise NotImplementedError("StorageHandler.data is not available")
+
+    @data.setter
+    def data(self, value):
+        if not isinstance(value, str):
+            value = str(value)
+        if isinstance(value, str):
+            value = value.encode("utf-8")
+
+        with self.storage.open("w") as fo:
+            fo.write(value)
+
+    @property
+    def stream(self):
+        raise NotImplementedError("StorageHandler.stream is not available")
+
+    @stream.setter
+    def stream(self, value):
+        with self.storage.open("w") as fo:
+            while True:
+                buffer = value.read(4096 * 64)
+                if len(buffer) == 0:
+                    break
+                if isinstance(buffer, str):
+                    buffer = buffer.encode("utf-8")
+                fo.write(buffer)
+
+    @property
+    def url(self):
+        raise NotImplementedError("StorageHandler.url is not available")
+
+    @url.setter
+    def url(self, value):
+        # TODO: special case, if the output is as_reference, store the URL
+        raise NotImplementedError("StorageHandler.url.setter is not available")
+
+    # Give to the data store an url
+    def export(self):
+        return self.storage.export(self.identifier + self.data_format.extension, self.data_format.mime_type)

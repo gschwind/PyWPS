@@ -619,24 +619,28 @@ def get_output_from_xml(doc):
     if xpath_ns(doc, '/wps:Execute/wps:ResponseForm/wps:ResponseDocument'):
         for output_el in xpath_ns(doc, '/wps:Execute/wps:ResponseForm/wps:ResponseDocument/wps:Output'):
             [identifier_el] = xpath_ns(output_el, './ows:Identifier')
+            identifier = identifier_el.text.rstrip().lstrip()
             outpt = {}
-            outpt[identifier_el.text] = ''
+            outpt[identifier] = ''
+            outpt['identifier'] = identifier
             outpt['mimetype'] = output_el.attrib.get('mimeType', None)
-            outpt['encoding'] = output_el.attrib.get('encoding', '')
-            outpt['schema'] = output_el.attrib.get('schema', '')
-            outpt['uom'] = output_el.attrib.get('uom', '')
-            outpt['asReference'] = output_el.attrib.get('asReference', 'false')
+            outpt['encoding'] = output_el.attrib.get('encoding', None)
+            outpt['schema'] = output_el.attrib.get('schema', None)
+            outpt['uom'] = output_el.attrib.get('uom', None)
+            outpt['asReference'] = output_el.attrib.get('asReference', None)
             the_output[identifier_el.text] = outpt
 
     elif xpath_ns(doc, '/wps:Execute/wps:ResponseForm/wps:RawDataOutput'):
         for output_el in xpath_ns(doc, '/wps:Execute/wps:ResponseForm/wps:RawDataOutput'):
             [identifier_el] = xpath_ns(output_el, './ows:Identifier')
+            identifier = identifier_el.text.rstrip().lstrip()
             outpt = {}
-            outpt[identifier_el.text] = ''
+            outpt[identifier] = ''
+            outpt['identifier'] = identifier
             outpt['mimetype'] = output_el.attrib.get('mimeType', None)
-            outpt['encoding'] = output_el.attrib.get('encoding', '')
-            outpt['schema'] = output_el.attrib.get('schema', '')
-            outpt['uom'] = output_el.attrib.get('uom', '')
+            outpt['encoding'] = output_el.attrib.get('encoding', None)
+            outpt['schema'] = output_el.attrib.get('schema', None)
+            outpt['uom'] = output_el.attrib.get('uom', None)
             the_output[identifier_el.text] = outpt
 
     return the_output

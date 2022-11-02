@@ -205,24 +205,24 @@ class ComplexInputTest(unittest.TestCase):
 
         self.complex_in.data = "Hallo world!"
 
-    def test_validator(self):
-        self.assertEqual(self.complex_in.data_format.validate,
-                         get_validator('application/json'))
-        self.assertEqual(self.complex_in.validator,
-                         get_validator('application/json'))
-        frmt = get_data_format('application/json')
-
-        def my_validate():
-            return True
-
-        frmt.validate = my_validate
-        self.assertNotEqual(self.complex_in.validator, frmt.validate)
+    # def test_validator(self):
+    #     self.assertEqual(self.complex_in.data_format.validate,
+    #                      get_validator('application/json'))
+    #     self.assertEqual(self.complex_in.validator,
+    #                      get_validator('application/json'))
+    #     frmt = get_data_format('application/json')
+    #
+    #     def my_validate():
+    #         return True
+    #
+    #     frmt.validate = my_validate
+    #     self.assertNotEqual(self.complex_in.validator, frmt.validate)
 
     def test_contruct(self):
         self.assertIsInstance(self.complex_in, inout.inputs.ComplexInput)
 
-    def test_data_format(self):
-        self.assertIsInstance(self.complex_in.supported_formats[0], Format)
+    # def test_data_format(self):
+    #     self.assertIsInstance(self.complex_in.supported_formats[0], Format)
 
 
 class SerializationComplexInputTest(unittest.TestCase):

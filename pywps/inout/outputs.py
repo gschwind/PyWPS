@@ -19,32 +19,53 @@ from pywps.validator.mode import MODE
 from pywps import configuration as config
 from pywps.inout.formats import Format, Supported_Formats, FORMATS
 
+from .basic import StorageHandler, IOHandler
+from .spec import UOM
 
-class BoundingBoxOutput(basic.IOHandler):
-    """
-    :param identifier: The name of this input.
-    :param str title: Title of the input
-    :param str abstract: Input abstract
-    :param crss: List of supported coordinate reference system (e.g. ['EPSG:4326'])
-    :param int dimensions: number of dimensions (2 or 3)
-    :param int min_occurs: minimum occurence
-    :param int max_occurs: maximum occurence
-    :param pywps.validator.mode.MODE mode: validation mode (none to strict)
-    :param metadata: List of metadata advertised by this process. They
-                     should be :class:`pywps.app.Common.Metadata` objects.
-    :param dict[str,dict[str,str]] translations: The first key is the RFC 4646 language code,
-        and the nested mapping contains translated strings accessible by a string property.
-        e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
-    """
 
-    def __init__(self, spec, *args, as_reference=False, **kwargs):
-        super().__init__(spec, *args, **kwargs)
-        self.as_reference = as_reference
+class BoundingBoxOutput(IOHandler):
+    type = 'bbox'
+
+    def __init__(self, spec, json, *args, workdir=None, **kwargs):
+        super().__init__(spec, *args, workdir=workdir, **kwargs)
+
+        if json is not None:
+            self.workdir = self.workdir or json.get('workdir', None)
+
+            self.crs = json.get('crs', self.spec.crss[0])
+            if self.crs not in self.spec.crss:
+                raise InvalidParameterValue(f"Not supported CRS: {self.crs}")
+
+            self.dimensions = json.get('dimensions', 2)
+
+            # Initialize IOHandler
+            if 'data' in json:
+                self.data = json['data']
 
     def as_json(self):
-        return self.spec.as_json()
+        o = {
+            # Required for lineage=True
+            'crs': self.crs,
+            'dimensions': self.dimensions,
+            'll': self.ll,
+            'ur': self.ur,
+
+            'identifier': self.spec.identifier,
+            'title': self.spec.title,
+            'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
+
+            # Required for serialization
+            'type': BoundingBoxOutput.type,
+            'workdir': self.workdir
+        }
+
+        # TODO: make data in the good format
+        if self._iohandler:
+            o['data'] = self.data
 
 
+    # Used for serialisation and within the excecute template.
     @property
     def json(self):
         """Get JSON representation of the output
@@ -53,26 +74,11 @@ class BoundingBoxOutput(basic.IOHandler):
 
     @classmethod
     def from_json(cls, json_output):
-        instance = cls(
-            identifier=json_output['identifier'],
-            title=json_output['title'],
-            abstract=json_output['abstract'],
-            keywords=json_output['keywords'],
-            min_occurs=json_output['min_occurs'],
-            max_occurs=json_output['max_occurs'],
-            metadata=[Metadata.from_json(data) for data in json_output.get('metadata', [])],
-            crss=json_output['crss'],
-            dimensions=json_output['dimensions'],
-            mode=json_output['mode'],
-            translations=json_output.get('translations'),
-        )
-        instance.data = json_output['bbox']
-        instance.workdir = json_output['workdir']
-
-        return instance
+        raise NotImplementedError("Use BoundingBoxOutput.__init__ instead")
 
 
-class ComplexOutput(basic.IOHandler):
+class ComplexOutput(IOHandler):
+    type = 'complex'
     """
     :param identifier: The name of this output.
     :param title: Readable form of the output name.
@@ -88,99 +94,71 @@ class ComplexOutput(basic.IOHandler):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, spec, *args, as_reference=False, **kwargs):
-        super().__init__(spec, *args, **kwargs)
+    # TODO: doc string
+    def __init__(self, spec, json, *args, workdir=None, **kwargs):
+        super().__init__(spec, *args, workdir=workdir, **kwargs)
 
-        self.as_reference = as_reference
-        self.storage = None
+        self.mimetype = json.get('mimetype', None)
+        self.encoding = json.get('encoding', None)
+        self.schema = json.get('schema', None)
+
+        self.workdir = self.workdir or json.get('workdir', None)
+
+        if self.mimetype is None:
+            self.data_format = spec.supported_formats[0]
+        else:
+            self.data_format = spec.get_format(self.mimetype)
+            if self.data_format is None:
+                raise InvalidParameterValue(
+                    'Invalid mimetype value {} for input {}'.format(
+                        json.get('mimeType'), spec.identifier),
+                    'mimeType')
+
+        # Initialize IOHandler
+        if 'data' in json:
+            self.data = json['data']
 
     def as_json(self):
-        data = super().as_json()
-        data['asreference'] = self.as_reference
+        # Store actual request data.
+        return {
+            # Required for output template
+            'mimetype': self.mimetype,
+            'encoding': self.encoding,
+            'schema': self.schema,
+            'data': self.data, #< TODO: Maybe too simple
+
+            'identifier': self.spec.identifier,
+            'title': self.spec.title,
+            'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
+
+            # Required for serialization
+            'type': ComplexOutput.type,
+            'workdir': self.workdir
+        }
 
     @property
     def json(self):
-        """Get JSON representation of the output
-        """
-        data = self.as_json()
-
-        if self.data_format:
-            if self.data_format.mime_type:
-                data['mimetype'] = self.data_format.mime_type
-            if self.data_format.encoding:
-                data['encoding'] = self.data_format.encoding
-            if self.data_format.schema:
-                data['schema'] = self.data_format.schema
-
-        if self.as_reference:
-            data = self._json_reference(data)
-        else:
-            data = self._json_data(data)
-
-        return data
+        return self.as_json()
 
     @classmethod
     def from_json(cls, json_output):
-        instance = cls(
-            identifier=json_output['identifier'],
-            title=json_output.get('title'),
-            abstract=json_output.get('abstract'),
-            keywords=json_output.get('keywords', []),
-            workdir=json_output.get('workdir'),
-            metadata=[Metadata.from_json(data) for data in json_output.get('metadata', [])],
-            data_format=Format(
-                schema=json_output['data_format'].get('schema'),
-                extension=json_output['data_format'].get('extension'),
-                mime_type=json_output['data_format']['mime_type'],
-                encoding=json_output['data_format'].get('encoding')
-            ),
-            supported_formats=[
-                Format(
-                    schema=infrmt.get('schema'),
-                    extension=infrmt.get('extension'),
-                    mime_type=infrmt['mime_type'],
-                    encoding=infrmt.get('encoding')
-                ) for infrmt in json_output['supported_formats']
-            ],
-            mode=json_output.get('mode', MODE.NONE),
-            translations=json_output.get('translations'),
-        )
-        instance.as_reference = json_output.get('asreference', False)
-        if json_output.get('file'):
-            instance.file = json_output['file']
+        raise NotImplementedError("Use ComplexOutput.__init__ instead")
 
-        return instance
 
-    def _json_reference(self, data):
-        """Return Reference node
-        """
-        data["type"] = "reference"
-
-        # get_url will create the file and return the url for it
-        if self.prop == 'url':
-            data["href"] = self.url
-        elif self.prop is not None:
-            self.storage = new_storage()
-            data["href"] = self.export()
-
-        return data
-
-    def _json_data(self, data):
-        """Return Data node
-        """
-        data["type"] = "complex"
-
+    # FIXME: TODO
+    def _data(self):
         if self.data:
             if self.data_format.mime_type in [FORMATS.GEOJSON.mime_type, FORMATS.JSON.mime_type]:
-                data["data"] = self.data
+                return self.data
             elif self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
                 # Note that in a client-server round trip, the original and returned file will not be identical.
                 data_doc = etree.parse(self.file)
-                data["data"] = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
+                return etree.tostring(data_doc, pretty_print=True).decode('utf-8')
 
             else:
                 if self.data_format.encoding == 'base64':
-                    data["data"] = self.base64.decode('utf-8')
+                    return self.base64.decode('utf-8')
                 else:
                     # Match only data that are safe CDATA pattern.
                     CDATA_PATTERN = re.compile(r'^<!\[CDATA\[((?!\]\]>).)*\]\]>$')
@@ -221,7 +199,8 @@ class ComplexOutput(basic.IOHandler):
         return data
 
 
-class LiteralOutput(basic.IOHandler):
+class LiteralOutput(IOHandler):
+    type = 'literal'
     """
     :param identifier: The name of this output.
     :param str title: Title of the input
@@ -236,39 +215,120 @@ class LiteralOutput(basic.IOHandler):
         e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
     """
 
-    def __init__(self, spec, *args, **kwargs):
-        super().__init__(spec, *args, **kwargs)
+    def __init__(self, spec, json, *args, workdir=None, **kwargs):
+        super().__init__(spec, *args, workdir=workdir, **kwargs)
+
+        if json is not None:
+            self.workdir = self.workdir or json.get('workdir', None)
+
+            # TODO: check datatype
+
+            default_uom = None
+            if self.spec.uoms is not None and len(self.spec.uoms) > 0:
+                default_uom = self.spec.uoms[0]
+            self.uom = json.get('uom', default_uom)
+            if isinstance(self.uom, str):
+                self.uom = self._lookup_uom(self.uom)
+                if self.uom is None:
+                    raise InvalidParameterValue(
+                        f"Invalid uom `{json.get('uom', default_uom)}` for parameter {self.spec.identifier}")
+            elif isinstance(self.uom, dict):
+                self.uom = UOM(self.uom['uom'], self.uom['reference'])
+
+            self.data_type = json.get('datatype', None)
+
+            # Initialize IOHandler
+            if 'data' in json:
+                self.data = json['data']
+
+    # Lookup for UOM within spec
+    def _lookup_uom(self, s):
+        for u in self.spec.uoms:
+            if s == u.reference:
+                return u
+            if s == u.uom:
+                return u
+        return None
+
+
 
     @property
     def json(self):
-        """Get JSON representation of the output
+        """Get JSON representation of the input
         """
-        data = self.spec.as_json()
-        return data
+
+        return {
+            # Used by execute template
+            'uom': None if self.uom is None else self.uom.json,
+            'data': self.data, #< TODO: To simple for now
+
+            'identifier': self.spec.identifier,
+            'title': self.spec.title,
+            'abstract': self.spec.abstract,
+            'data_type': self.spec.data_type,
+            'translations': self.spec.translations,
+
+            # Required for serialization
+            'type': LiteralOutput.type,
+            'workdir': self.workdir
+        }
 
     @classmethod
     def from_json(cls, json_output):
-        uoms = [
-            basic.UOM(uom['uom'], uom['reference'])
-            for uom in json_output.get('uoms', [])
-        ]
-        uom = json_output.get('uom')
+        raise NotImplementedError("Use LiteralOutput.__init__ instead")
 
-        instance = cls(
-            identifier=json_output['identifier'],
-            title=json_output['title'],
-            data_type=json_output['data_type'],
-            abstract=json_output['abstract'],
-            keywords=json_output['keywords'],
-            uoms=uoms,
-            translations=json_output.get('translations'),
-        )
 
-        instance.data = json_output.get('data')
-        if uom:
-            instance.uom = basic.UOM(uom['uom'], uom['reference'])
+class ReferenceOutput(StorageHandler):
+    type = 'reference'
 
-        return instance
+    # TODO: doc string
+    def __init__(self, spec, json, *args, **kwargs):
+        super().__init__(spec, *args, **kwargs)
+
+        self.mimetype = json.get('mimetype', None)
+        self.encoding = json.get('encoding', None)
+        self.schema = json.get('schema', None)
+
+        if self.mimetype is None:
+            self.data_format = spec.supported_formats[0]
+        else:
+            self.data_format = spec.get_format(self.mimetype)
+            if self.data_format is None:
+                raise InvalidParameterValue(
+                    'Invalid mimeType value {} for input {}'.format(
+                        json.get('mimeType'), spec.identifier),
+                    'mimeType')
+
+    # TODO: if storage init storage
+
+    def as_json(self):
+        # Store actual request data.
+        return {
+            # Required for output template
+            'mimetype': self.mimetype,
+            'encoding': self.encoding,
+            'schema': self.schema,
+            'data': self.export(), #< TODO: Maybe too simple
+
+            'identifier': self.spec.identifier,
+            'title': self.spec.title,
+            'abstract': self.spec.abstract,
+            'translations': self.spec.translations,
+
+            # Required for serialization
+            'type': ComplexOutput.type,
+            'workdir': self.workdir,
+            # 'uuid': self._uuid
+        }
+
+    @property
+    def json(self):
+        return self.as_json()
+
+    @classmethod
+    def from_json(cls, json_input):
+        raise NotImplementedError("Use ReferenceInput.__init__ instead")
+
 
 
 class MetaFile:

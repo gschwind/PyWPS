@@ -71,6 +71,8 @@ class CapabilitiesTest(unittest.TestCase):
 
     def check_capabilities_response(self, resp):
 
+        print(resp.text)
+
         assert resp.status_code == 200
         assert resp.headers['Content-Type'] == 'text/xml'
         title = resp.xpath_text('/wps:Capabilities'
@@ -97,11 +99,7 @@ class CapabilitiesTest(unittest.TestCase):
         assert len(metadatas) == 2
 
     def test_get_request(self):
-        resp = self.client.get('/wps?Request=GetCapabilities&service=WpS')
-        self.check_capabilities_response(resp)
-
-        # case insesitive check
-        resp = self.client.get('/wps?request=getcapabilities&service=wps')
+        resp = self.client.get('/wps?Request=GetCapabilities&service=WPS')
         self.check_capabilities_response(resp)
 
     def test_post_request(self):
@@ -110,7 +108,7 @@ class CapabilitiesTest(unittest.TestCase):
         self.check_capabilities_response(resp)
 
     def test_get_bad_version(self):
-        resp = self.client.get('/wps?request=getcapabilities&service=wps&acceptversions=2001-123')
+        resp = self.client.get('/wps?request=getcapabilities&service=WPS&acceptversions=2001-123')
         exception = resp.xpath('/ows:ExceptionReport'
                                '/ows:Exception')
         assert resp.status_code == 400
@@ -164,7 +162,7 @@ class CapabilitiesTranslationsTest(unittest.TestCase):
         configuration.CONFIG.set('server', 'language', 'en-US')
 
     def test_get_translated(self):
-        resp = self.client.get('/wps?Request=GetCapabilities&service=wps&language=fr-CA')
+        resp = self.client.get('/wps?Request=GetCapabilities&service=WPS&language=fr-CA')
 
         assert resp.xpath('/wps:Capabilities/@xml:lang')[0] == "fr-CA"
 

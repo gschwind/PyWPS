@@ -7,6 +7,7 @@ import re
 from pywps import xml_util as etree
 import logging
 
+
 from pywps.app.Common import Metadata
 from pywps.exceptions import InvalidParameterValue
 from pywps.inout.formats import Format
@@ -16,6 +17,7 @@ from pywps.validator.mode import MODE
 from pywps.inout.literaltypes import AnyValue, NoValue, ValuesReference, AllowedValue
 
 from .basic import UOM
+from .literaltypes import convert
 
 CDATA_PATTERN = re.compile(r'<!\[CDATA\[(.*?)\]\]>')
 
@@ -198,7 +200,8 @@ class LiteralInput(basic.IOHandler):
         self.src_data = json['data']
 
         # Initialize IOHandler
-        self.data = self.src_data
+        # TODO: make beter converted
+        self.data = convert(self.spec.data_type, self.src_data)
 
 
     # Used in execute/status outputs XML if lineage=True

@@ -19,9 +19,7 @@ from pywps.validator.mode import MODE
 from pywps import configuration as config
 from pywps.inout.formats import Format, Supported_Formats, FORMATS
 
-from .basic import StorageHandler, IOHandler
-from .spec import UOM
-
+from .basic import StorageHandler, IOHandler, UOM
 
 class BoundingBoxOutput(IOHandler):
     type = 'bbox'

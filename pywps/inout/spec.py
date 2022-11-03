@@ -8,6 +8,8 @@ import logging
 import sys
 from collections import deque
 from . import inputs
+from . import outputs
+
 from pywps.exceptions import (StorageNotSupported, OperationNotSupported,
                               MissingParameterValue, FileURLNotSupported,
                               ServerBusy, NoApplicableCode,
@@ -93,6 +95,18 @@ class BasicIO:
             return self.validator(io, validate_mode)
         return True
 
+    def deserialize(self, json):
+        raise NotImplementedError(f"Not implemented {self.__class__}.deserialize")
+
+    def deserialize_list(self, l):
+        o = deque(maxlen=self.max_occurs)
+        for i in l:
+            o.append(self.deserialize(i))
+        if len(o) < self.min_occurs:
+            description = "At least {} inputs are required. You provided {}.".format(
+                self.min_occurs, len(o))
+            raise MissingParameterValue(description, locator=self.identifier)
+        return list(o)
 
 
 class BasicLiteral(BasicIO):
@@ -135,8 +149,8 @@ class BasicLiteral(BasicIO):
     def as_json(self):
         data = super().as_json()
         data['data_type'] = self.data_type
-
         if self.uoms:
+            data['uom'] = self.uoms[0].json
             data["uoms"] = [uom.json for uom in self.uoms]
         return data
 
@@ -254,12 +268,11 @@ class BasicBoundingBox(BasicIO):
         data = super().as_json()
         data.update({
             'type': 'bbox',
+            'crs': self.crss[0],
             'crss': self.crss,
             'dimensions': self.dimensions
         })
         return data
-
-
 
 
 class LiteralInput(BasicLiteral):
@@ -322,7 +335,11 @@ class LiteralInput(BasicLiteral):
         else:
             return validate_value(io, validate_mode)
 
-    def create(self, request_inputs):
+    def deserialize(self, json):
+        assert json['type'] == inputs.LiteralInput.type
+        return inputs.LiteralInput(self, json)
+
+    def xcomment(self):
         if request_inputs is None:
             # TODO: default values or exception
             ...
@@ -351,6 +368,10 @@ class LiteralOutput(BasicLiteral):
     def create(self, json):
         return outputs.LiteralOuput(self, json)
 
+    def deserialize(self, json):
+        assert json['type'] == outputs.LiteralOuput.type
+        return outputs.LiteralOuput(self, json)
+
 
 class BoundingBoxInput(BasicBoundingBox):
     """Basic Bounding box input abstract class
@@ -368,7 +389,12 @@ class BoundingBoxInput(BasicBoundingBox):
         # TODO: use to build default value in inputs.BoundingBoxInput
         # self._set_default_value(default, default_type)
 
-    def create(self, json):
+    def deserialize(self, json, *args, **kwargs):
+        assert json['type'] == inputs.BoundingBoxInput.type
+        return inputs.BoundingBoxInput(self, json)
+
+
+    def renamexx(self, json):
         return inputs.BoundingBoxInput(self, json)
 
         outinputs = deque(maxlen=self.max_occurs)
@@ -399,6 +425,9 @@ class BoundingBoxOutput(BasicBoundingBox):
         super().__init__(*args, **kwargs)
 
     def create(self, json):
+        return outputs.BounddingBoxOuput(self, json)
+
+    def deserialize(self, json):
         return outputs.BounddingBoxOuput(self, json)
 
 
@@ -453,7 +482,14 @@ class ComplexInput(BasicComplex):
                 return
         raise FileURLNotSupported()
 
-    def create(self, request_inputs):
+    def deserialize(self, json):
+        if json['type'] == inputs.ComplexInput.type:
+            return inputs.ComplexInput(self, json)
+        if json['type'] == inputs.ReferenceInput.type:
+            return inputs.ReferenceInput(self, json)
+        raise NotImplementedError("Unknown type "+str(json['type']))
+
+    def somethoing_else(self, request_inputs):
         if request_inputs is None:
             # TODO: create default values
             ...
@@ -501,6 +537,14 @@ class ComplexOutput(BasicComplex):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def deserialize(self, json):
+        if json['type'] == outputs.ComplexOutput.type:
+            return outputs.ComplexOutput(self, json)
+        if json['type'] == outputs.ReferenceOutput.type:
+            return outputs.ReferenceOutput(self, json)
+        raise NotImplementedError("Unknown type: "+json['type'])
+
 
     def create(self, json):
         as_reference = False

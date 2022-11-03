@@ -29,12 +29,14 @@ default_version = '1.0.0'
 
 class WPSRequest(object):
 
-    def __init__(self, **kwargs):
+    def __init__(self, spec, **kwargs):
         """Create a new WPS request, valid kwargs are:
             - http_request: The http request used
             - preprocessors: preprocessors list
             - json: a json string
         """
+
+        self.spec = spec
 
         # TODO: Remove self.http_request because it usage is insane
         self.http_request = kwargs.get("http_request", None)
@@ -452,13 +454,13 @@ class WPSRequest(object):
     def json(self):
         """Return JSON encoded representation of the request
         """
-        class ExtendedJSONEncoder(json.JSONEncoder):
-            def default(self, obj):
-                if isinstance(obj, datetime.date) or isinstance(obj, datetime.time):
-                    encoded_object = obj.isoformat()
-                else:
-                    encoded_object = json.JSONEncoder.default(self, obj)
-                return encoded_object
+        # class ExtendedJSONEncoder(json.JSONEncoder):
+        #     def default(self, obj):
+        #         if isinstance(obj, datetime.date) or isinstance(obj, datetime.time):
+        #             encoded_object = obj.isoformat()
+        #         else:
+        #             encoded_object = json.JSONEncoder.default(self, obj)
+        #         return encoded_object
 
         obj = {
             'uuid': str(self.uuid),
@@ -478,7 +480,8 @@ class WPSRequest(object):
             'is_async': self.is_async
         }
 
-        return json.dumps(obj, allow_nan=False, cls=ExtendedJSONEncoder)
+        return obj
+        # return json.dumps(obj, allow_nan=False, cls=ExtendedJSONEncoder)
 
     @json.setter
     def json(self, value):
@@ -504,25 +507,20 @@ class WPSRequest(object):
         self.lineage = value.get('lineage', False)
         self.outputs = value.get('outputs')
         self.raw = value.get('raw', False)
-        self.inputs = {}
 
-        for identifier in value.get('inputs', []):
-            inpt_defs = value['inputs'][identifier]
-            if not isinstance(inpt_defs, (list, tuple)):
-                inpt_defs = [inpt_defs]
-            self.inputs[identifier] = []
-            for inpt_def in inpt_defs:
-                if not isinstance(inpt_def, dict):
-                    inpt_def = {"data": inpt_def}
-                if 'identifier' not in inpt_def:
-                    inpt_def['identifier'] = identifier
-                try:
-                    inpt = input_from_json(inpt_def)
-                    self.inputs[identifier].append(inpt)
-                except Exception as e:
-                    LOGGER.warning(e)
-                    LOGGER.warning(f'skipping input: {identifier}')
-                    pass
+        self.inputs = dict()
+        xinputs = value.get('inputs', dict())
+        for x in self.spec.inputs:
+            if x.identifier not in xinputs:
+                continue
+            self.inputs[x.identifier] = x.deserialize_list(xinputs[x.identifier])
+
+        self.outputs = dict()
+        xoutputs = value.get('outputs', dict())
+        for x in self.spec.outputs:
+            if x.identifier not in xoutputs:
+                continue
+            self.outputs[x.identifier] = x.deserialize(xoutputs[x.identifier])
 
 # convert XML inputs into python dictionary
 def get_inputs_from_xml(doc):

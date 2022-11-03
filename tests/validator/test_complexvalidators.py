@@ -158,7 +158,7 @@ class ValidateTest(unittest.TestCase):
         opendap_input = ComplexInput('dods', 'opendap test', [FORMATS.DODS,],
                                      default='http://test.opendap.org',
                                      default_type=SOURCE_TYPE.URL,
-                                     mode=MODE.SIMPLE)
+                                     validate_mode=MODE.SIMPLE)
 
     def test_fail_validator(self):
         fake_input = get_input('point.xsd', 'point.xsd', FORMATS.SHP.mime_type)

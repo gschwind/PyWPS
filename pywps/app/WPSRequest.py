@@ -29,17 +29,12 @@ default_version = '1.0.0'
 
 class WPSRequest(object):
 
-    def __init__(self, spec, **kwargs):
+    def __init__(self, **kwargs):
         """Create a new WPS request, valid kwargs are:
             - http_request: The http request used
             - preprocessors: preprocessors list
             - json: a json string
         """
-
-        self.spec = spec
-
-        # TODO: Remove self.http_request because it usage is insane
-        self.http_request = kwargs.get("http_request", None)
 
         self.preprocessors = kwargs.get("preprocessors", {})
 

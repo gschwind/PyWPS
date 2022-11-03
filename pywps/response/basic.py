@@ -13,8 +13,9 @@ import os
 
 class WPSResponse(object):
 
-    def __init__(self, wps_request: 'WPSRequest', uuid=None, version="1.0.0"):
+    def __init__(self, http_request, wps_request: 'WPSRequest', uuid=None, version="1.0.0"):
 
+        self.http_request = http_request
         self.wps_request = wps_request
         self.uuid = uuid
         self.message = ''

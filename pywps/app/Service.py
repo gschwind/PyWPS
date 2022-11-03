@@ -90,11 +90,11 @@ class Service(object):
             if not LOGGER.handlers:
                 LOGGER.addHandler(logging.NullHandler())
 
-    def get_capabilities(self, wps_request, uuid):
-        return CapabilitiesResponse(wps_request, uuid, version=wps_request.version, processes=self.processes)
+    def get_capabilities(self, http_request, wps_request, uuid):
+        return CapabilitiesResponse(http_request, wps_request, uuid, version=wps_request.version, processes=self.processes)
 
-    def describe(self, wps_request, uuid, identifiers):
-        return DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=identifiers)
+    def describe(self, http_request, wps_request, uuid, identifiers):
+        return DescribeResponse(http_request, wps_request, uuid, processes=self.processes, identifiers=identifiers)
 
     # Return more or less accurate counts, if no concurrency
     def _get_accurate_process_counts(self):
@@ -109,7 +109,7 @@ class Service(object):
         while self.launch_next_process():
             pass
 
-    def execute(self, wps_request: WPSRequest):
+    def execute(self, http_request, wps_request: WPSRequest):
         """Parse and perform Execute WPS request call
 
         :param identifier: process identifier string
@@ -349,15 +349,15 @@ class Service(object):
             try:
                 response = None
                 if wps_request.operation == 'getcapabilities':
-                    response = self.get_capabilities(wps_request, wps_request.uuid)
+                    response = self.get_capabilities(http_request, wps_request, wps_request.uuid)
                     response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
 
                 elif wps_request.operation == 'describeprocess':
-                    response = self.describe(wps_request, wps_request.uuid, wps_request.identifiers)
+                    response = self.describe(http_request, wps_request, wps_request.uuid, wps_request.identifiers)
                     response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
 
                 elif wps_request.operation == 'execute':
-                    response = self.execute(wps_request)
+                    response = self.execute(http_request, wps_request)
                 return response
             except Exception as e:
                 # This ensure that logged request get terminated in case of exception while the request is not

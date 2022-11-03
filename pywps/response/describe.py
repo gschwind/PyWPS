@@ -13,9 +13,9 @@ import os, sys
 
 class DescribeResponse(WPSResponse):
 
-    def __init__(self, wps_request, uuid, **kwargs):
+    def __init__(self, http_request, wps_request, uuid, **kwargs):
 
-        super(DescribeResponse, self).__init__(wps_request, uuid)
+        super(DescribeResponse, self).__init__(http_request, wps_request, uuid)
 
         self.identifiers = None
         if "identifiers" in kwargs:
@@ -53,7 +53,7 @@ class DescribeResponse(WPSResponse):
 
         doc = self.json
         mimetype = select_response_mimetype(
-            self.wps_request.http_request.accept_mimetypes, self.wps_request.default_mimetype)
+            self.http_request.accept_mimetypes, self.wps_request.default_mimetype)
         if mimetype == 'application/json':
             doc = json.dumps(self._render_json_response(doc), indent=get_json_indent())
         else:

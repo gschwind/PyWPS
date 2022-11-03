@@ -31,7 +31,7 @@ WPS, OWS = get_ElementMakerForVersion("1.0.0")
 
 class ExecuteResponse(WPSResponse):
 
-    def __init__(self, wps_request, uuid, **kwargs):
+    def __init__(self, http_request, wps_request, uuid, **kwargs):
         """constructor
 
         :param pywps.app.WPSRequest.WPSRequest wps_request:
@@ -39,14 +39,14 @@ class ExecuteResponse(WPSResponse):
         :param uuid: string this request uuid
         """
 
-        super(ExecuteResponse, self).__init__(wps_request, uuid)
+        super(ExecuteResponse, self).__init__(http_request, wps_request, uuid)
 
         self.process = kwargs["process"]
         self.outputs = {o.identifier: copy.deepcopy(o) for o in self.process.outputs}
         self.store_status_file = False
 
         # select the output mimetype
-        accept_mimetypes = getattr(self.wps_request.http_request, 'accept_mimetypes', None)
+        accept_mimetypes = getattr(self.http_request, 'accept_mimetypes', None)
         self.mimetype = select_response_mimetype(accept_mimetypes, self.wps_request.default_mimetype)
 
     # override WPSResponse._update_status
@@ -152,7 +152,7 @@ class ExecuteResponse(WPSResponse):
                 self.wps_request.preprocess_response:
             self.outputs = self.wps_request.preprocess_response(self.outputs,
                                                                 request=self.wps_request,
-                                                                http_request=self.wps_request.http_request)
+                                                                http_request=self.http_request)
             self.preprocess_response = None
 
         data = {}

@@ -43,7 +43,8 @@ xpath_ns = get_xpath_ns("1.0.0")
 
 def get_describe_result(resp):
     assert resp.status_code == 200
-    assert resp.headers['Content-Type'] == 'text/xml'
+    assert resp.headers['Content-Type'] == 'text/xml' \
+            or resp.headers['Content-Type'] == 'text/xml; charset=utf-8'
     result = []
     for desc_el in resp.xpath('/wps:ProcessDescriptions/ProcessDescription'):
         [identifier_el] = xpath_ns(desc_el, './ows:Identifier')

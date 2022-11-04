@@ -9,74 +9,51 @@ from pywps.exceptions import InvalidParameterValue
 from .basic import WPSResponse
 from pywps import __version__
 import os, sys
+from pywps.translations import get_translation
+
+from jinja2 import Environment, PackageLoader
+from . import RelEnvironment
+from werkzeug.wrappers import Response
 
 
-class DescribeResponse(WPSResponse):
+class DescribeResponse(Response):
 
-    def __init__(self, http_request, wps_request, uuid, **kwargs):
+    def __init__(self, http_request, wps_request, service_processes: dict):
 
-        super(DescribeResponse, self).__init__(http_request, wps_request, uuid)
+        # TODO: find better alternative
+        self.template_env = RelEnvironment(
+            loader=PackageLoader('pywps', 'templates'),
+            trim_blocks=True, lstrip_blocks=True,
+            autoescape=True,
+        )
+        self.template_env.globals.update(get_translation=get_translation)
 
-        self.identifiers = None
-        if "identifiers" in kwargs:
-            self.identifiers = kwargs["identifiers"]
-        self.processes = kwargs["processes"]
-
-    @property
-    def json(self):
-
-        processes = []
-
-        if 'all' in (ident.lower() for ident in self.identifiers):
-            processes = (self.processes[p].json for p in self.processes)
-        else:
-            for identifier in self.identifiers:
-                if identifier not in self.processes:
-                    msg = "Unknown process {}".format(identifier)
-                    raise InvalidParameterValue(msg, "identifier")
-                else:
-                    processes.append(self.processes[identifier].json)
-
-        return {
-            'pywps_version': __version__,
-            'processes': processes,
-            'language': self.wps_request.language,
-        }
-
-    @staticmethod
-    def _render_json_response(jdoc):
-        return jdoc
-
-    def _construct_doc(self):
-        if not self.identifiers:
+        if not wps_request.identifiers:
             raise MissingParameterValue('Missing parameter value "identifier"', 'identifier')
 
-        doc = self.json
-        mimetype = select_response_mimetype(
-            self.http_request.accept_mimetypes, self.wps_request.default_mimetype)
-        if mimetype == 'application/json':
-            doc = json.dumps(self._render_json_response(doc), indent=get_json_indent())
+        if "all" in wps_request.identifiers:
+            processes = service_processes.values()
         else:
-            template = self.template_env.get_template(self.version + '/describe/main.xml')
-            max_size = int(config.get_size_mb(config.get_config_value('server', 'maxsingleinputsize')))
-            doc = template.render(max_size=max_size, **doc)
-        return doc, mimetype
+            processes = list()
+            for i in wps_request.identifiers:
+                if i in service_processes:
+                    processes.append(service_processes[i])
+                else:
+                    raise InvalidParameterValue(f"Unknown process {i}")
 
-    @Request.application
-    def __call__(self, request):
-        # This function must return a valid response.
-        try:
-            doc, content_type = self.get_response_doc()
-            return make_response(doc, content_type=content_type)
-        except NoApplicableCode as e:
-            import traceback
-            print("-" * 60)
-            traceback.print_exc(file=sys.stdout)
-            print("-" * 60)
-            return e
-        except Exception as e:
-            import traceback
-            print("-" * 60)
-            traceback.print_exc(file=sys.stdout)
-            print("-" * 60)
-            return NoApplicableCode(str(e))
+        data = {
+            'pywps_version': __version__,
+            'processes': [p.json for p in processes],
+            'language': wps_request.language
+        }
+
+        mimetype = select_response_mimetype(
+            http_request.accept_mimetypes, wps_request.default_mimetype)
+        if mimetype == 'application/json':
+            doc = json.dumps(data, indent=get_json_indent())
+        else:
+            print(mimetype)
+            template = self.template_env.get_template(wps_request.version + '/describe/main.xml')
+            max_size = int(config.get_size_mb(config.get_config_value('server', 'maxsingleinputsize')))
+            doc = template.render(max_size=max_size, **data)
+        super(DescribeResponse, self).__init__(response=doc, mimetype=mimetype)

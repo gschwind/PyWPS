@@ -35,9 +35,6 @@ SOURCE_TYPE = _SOURCE_TYPE(0, 1, 2, 3, 4)
 
 LOGGER = logging.getLogger("PYWPS")
 
-
-
-
 class BasicIO:
     """Store common data needed for the description of WPS inputs parameters
     or outputs parameters. Developers note: Should never handle actual data.
@@ -312,9 +309,10 @@ class LiteralInput(BasicLiteral):
             'any_value': self.any_value
         })
 
-        if self._default is not None:
-            data['data'] = str(self._default)
+        # if self._default is not None:
+        #     data['data'] = str(self._default)
 
+        print("ZZZZ", data)
         return data
 
     def validate(self, io, validate_mode):
@@ -339,19 +337,19 @@ class LiteralInput(BasicLiteral):
         assert json['type'] == inputs.LiteralInput.type
         return inputs.LiteralInput(self, json)
 
-    def xcomment(self):
+    def create(self, request_inputs, workdir=None):
         if request_inputs is None:
             # TODO: default values or exception
             ...
 
         o = deque(maxlen=self.max_occurs)
         for i in request_inputs:
-            o.append(inputs.LiteralInput(self, i))
+            o.append(inputs.LiteralInput(self, i, workdir=workdir))
         if len(o) < self.min_occurs:
             description = "At least {} inputs are required. You provided {}.".format(
                 self.min_occurs, len(o))
             raise MissingParameterValue(description, locator=self.identifier)
-        return o
+        return list(o)
 
 
 class LiteralOutput(BasicLiteral):
@@ -365,12 +363,12 @@ class LiteralOutput(BasicLiteral):
     def as_json(self):
         return super().as_json()
 
-    def create(self, json):
-        return outputs.LiteralOuput(self, json)
+    def create(self, json, workdir=None):
+        return outputs.LiteralOutput(self, json, workdir=workdir)
 
     def deserialize(self, json):
-        assert json['type'] == outputs.LiteralOuput.type
-        return outputs.LiteralOuput(self, json)
+        assert json['type'] == outputs.LiteralOutput.type
+        return outputs.LiteralOutput(self, json)
 
 
 class BoundingBoxInput(BasicBoundingBox):
@@ -393,28 +391,22 @@ class BoundingBoxInput(BasicBoundingBox):
         assert json['type'] == inputs.BoundingBoxInput.type
         return inputs.BoundingBoxInput(self, json)
 
+    def create(self, request_inputs, workdir=None):
+        if request_inputs is None:
+            # TODO: create default values
+            ...
 
-    def renamexx(self, json):
-        return inputs.BoundingBoxInput(self, json)
+        o = deque(maxlen=self.max_occurs)
+        for i in request_inputs:
+            o.append(inputs.BoundingBoxInput(self, i, workdir=workdir))
 
-        outinputs = deque(maxlen=self.max_occurs)
-
-        for inpt in inputs:
-            newinpt = source.clone()
-            newinpt.data = inpt.get('data')
-            LOGGER.debug(f'newinpt bbox data={newinpt.data}')
-            newinpt.crs = inpt.get('crs')
-            newinpt.dimensions = inpt.get('dimensions')
-            outinputs.append(newinpt)
-
-        if len(outinputs) < source.min_occurs:
+        if len(o) < self.min_occurs:
             description = "At least {} inputs are required. You provided {}.".format(
-                source.min_occurs,
-                len(outinputs),
+                self.min_occurs,
+                len(o),
             )
-            raise MissingParameterValue(description=description, locator=source.identifier)
-
-        return outinputs
+            raise MissingParameterValue(description=description, locator=self.identifier)
+        return o
 
 
 class BoundingBoxOutput(BasicBoundingBox):
@@ -424,11 +416,12 @@ class BoundingBoxOutput(BasicBoundingBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def create(self, json):
-        return outputs.BounddingBoxOuput(self, json)
+    def create(self, json, workdir=None):
+        return outputs.BoundingBoxOutput(self, json, workdir=workdir)
 
     def deserialize(self, json):
-        return outputs.BounddingBoxOuput(self, json)
+        return outputs.BoundingBoxOutput(self, json)
+
 
 
 class ComplexInput(BasicComplex):
@@ -489,14 +482,14 @@ class ComplexInput(BasicComplex):
             return inputs.ReferenceInput(self, json)
         raise NotImplementedError("Unknown type "+str(json['type']))
 
-    def somethoing_else(self, request_inputs):
+    def create(self, request_inputs, workdir=None):
         if request_inputs is None:
             # TODO: create default values
             ...
 
         o = deque(maxlen=self.max_occurs)
         for i in request_inputs:
-            o.append(inputs.ComplexInput(self, i))
+            o.append(inputs.ComplexInput(self, i, workdir=workdir))
 
         if len(o) < self.min_occurs:
             description = "At least {} inputs are required. You provided {}.".format(
@@ -545,12 +538,11 @@ class ComplexOutput(BasicComplex):
             return outputs.ReferenceOutput(self, json)
         raise NotImplementedError("Unknown type: "+json['type'])
 
-
-    def create(self, json):
+    def create(self, json, workdir=None):
         as_reference = False
         if json.get('asReference', None) is not None:
             as_reference = json['asReference']
         if as_reference:
-            return outputs.ReferenceOutput(self, json)
+            return outputs.ReferenceOutput(self, json, workdir=workdir)
         else:
-            return outputs.ComplexOutput(self, json)
+            return outputs.ComplexOutput(self, json, workdir=workdir)

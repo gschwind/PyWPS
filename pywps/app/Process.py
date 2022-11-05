@@ -12,6 +12,8 @@ import shutil
 import copy
 import tempfile
 
+from copy import deepcopy
+
 from pywps import dblog
 from pywps.response.status import WPS_STATUS
 from pywps.app.WPSRequest import WPSRequest
@@ -30,6 +32,9 @@ from pywps import configuration
 
 
 LOGGER = logging.getLogger("PYWPS")
+
+from .WPSExecuteResponse import WPSExecuteResponse
+from .WPSExecuteRequest import WPSExecuteRequest
 
 
 class Process(object):
@@ -103,182 +108,8 @@ class Process(object):
             'translations': self.translations,
         }
 
-
-# TODO: Private
-class ProcessInstance(object):
-    """
-    :param handler: A callable that gets invoked for each incoming
-                    request. It should accept a single
-                    :class:`pywps.app.WPSRequest` argument and return a
-                    :class:`pywps.app.WPSResponse` object.
-    :param string identifier: Name of this process.
-    :param string title: Human readable title of process.
-    :param string abstract: Brief narrative description of the process.
-    :param list keywords: Keywords that characterize a process.
-    :param inputs: List of inputs accepted by this process. They
-                   should be :class:`~LiteralInput` and :class:`~ComplexInput`
-                   and :class:`~BoundingBoxInput`
-                   objects.
-    :param outputs: List of outputs returned by this process. They
-                   should be :class:`~LiteralOutput` and :class:`~ComplexOutput`
-                   and :class:`~BoundingBoxOutput`
-                   objects.
-    :param metadata: List of metadata advertised by this process. They
-                     should be :class:`pywps.app.Common.Metadata` objects.
-    :param dict[str,dict[str,str]] translations: The first key is the RFC 4646 language code,
-        and the nested mapping contains translated strings accessible by a string property.
-        e.g. {"fr-CA": {"title": "Mon titre", "abstract": "Une description"}}
-    """
-
-    def __init__(self, handler, identifier, title, abstract='', keywords=None, profile=None,
-                 metadata=None, inputs=None, outputs=None, version='None', store_supported=False,
-                 status_supported=False, grass_location=None, translations=None):
-        self.identifier = identifier
-        self.handler = handler
-        self.title = title
-        self.abstract = abstract
-        self.keywords = keywords if keywords is not None else []
-        self.metadata = metadata if metadata is not None else []
-        self.profile = profile if profile is not None else []
-        self.version = version
-        self.inputs = inputs if inputs is not None else []
-        self.outputs = outputs if outputs is not None else []
-        self.uuid = None
-        self.workdir = None
-        self._grass_mapset = None
-        self.grass_location = grass_location
-        self.translations = lower_case_dict(translations)
-
-        if store_supported:
-            self.store_supported = 'true'
-        else:
-            self.store_supported = 'false'
-
-        if status_supported:
-            self.status_supported = 'true'
-        else:
-            self.status_supported = 'false'
-
-    # Used for describe process
-    @property
-    def json(self):
-        return {
-            'class': '{}:{}'.format(self.__module__, self.__class__.__name__),
-            'uuid': str(self.uuid),
-            'workdir': self.workdir,
-            'version': self.version,
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': [m.json for m in self.metadata],
-            'inputs': [i.as_json() for i in self.inputs],
-            'outputs': [o.as_json() for o in self.outputs],
-            'store_supported': self.store_supported,
-            'status_supported': self.status_supported,
-            'profile': [p for p in self.profile],
-            'translations': self.translations,
-        }
-
     def from_json(self, *args, **kwargs):
-        raise NotImplementedError("XXXX")
-
-    # Should not be used
-    # @classmethod
-    # def from_json(cls, value):
-    #     """init this process from json back again
-    #
-    #     :param value: the json (not string) representation
-    #     """
-    #     module, classname = value['class'].split(':')
-    #     # instantiate subclass of Process
-    #     new_process = getattr(importlib.import_module(module), classname)()
-    #     new_process._set_uuid(value['uuid'])
-    #     new_process.set_workdir(value['workdir'])
-    #     return new_process
-
-    def new_instance(self, wps_request: WPSRequest):
-        """Generate a new instance of that process with a new temporary directory"""
-        # make deep copy of the process instance
-        # so that processes are not overriding each other
-        # just for execute
-        process = copy.deepcopy(self)
-        workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
-        tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
-        process.set_workdir(tempdir)
-        process._set_uuid(wps_request.uuid)
-        return process
-
-    def _set_uuid(self, uuid):
-        """Set uuid and status location path and url
-        """
-
-        self.uuid = uuid
-        for inpt in self.inputs:
-            inpt.uuid = uuid
-
-        for outpt in self.outputs:
-            outpt.uuid = uuid
-
-    @property
-    def status_location(self):
-        base_url = configuration.get_config_value('server', 'url').rstrip('/')
-        return f'{base_url}/status?uuid={self.uuid}'
-
-    @property
-    def status_filename(self):
-        return str(self.uuid) + '.xml'
-
-    @property
-    def status_url(self):
-        return self.status_location
-
-    def run_process(self, wps_request, wps_response):
-        self._set_grass(wps_request)
-        # if required set HOME to the current working directory.
-        if config.get_config_value('server', 'sethomedir') is True:
-            os.environ['HOME'] = self.workdir
-            LOGGER.info('Setting HOME to current working directory: {}'.format(os.environ['HOME']))
-        LOGGER.debug('ProcessID={}, HOME={}'.format(self.uuid, os.environ.get('HOME')))
-        wps_response._update_status(WPS_STATUS.STARTED, 'PyWPS Process started', 0)
-        self.handler(wps_request, wps_response)  # the user must update the wps_response.
-        # Ensure process termination
-        if wps_response.status != WPS_STATUS.SUCCEEDED and wps_response.status != WPS_STATUS.FAILED:
-            # if (not wps_response.status_percentage) or (wps_response.status_percentage != 100):
-            LOGGER.debug('Updating process status to 100% if everything went correctly')
-            wps_response._update_status(WPS_STATUS.SUCCEEDED, f'PyWPS Process {self.title} finished', 100)
-        return wps_response
-
-    def clean(self):
-        """Clean the process working dir and other temporary files
-        """
-
-        print("XXXXX Clean dir")
-        if config.get_config_value('server', 'cleantempdir'):
-            LOGGER.info("Removing temporary working directory: {}".format(self.workdir))
-            try:
-                if os.path.isdir(self.workdir):
-                    shutil.rmtree(self.workdir)
-                if self._grass_mapset and os.path.isdir(self._grass_mapset):
-                    LOGGER.info("Removing temporary GRASS GIS mapset: {}".format(self._grass_mapset))
-                    shutil.rmtree(self._grass_mapset)
-            except Exception as err:
-                LOGGER.error('Unable to remove directory: {}'.format(err))
-        else:
-            LOGGER.warning('Temporary working directory is not removed: {}'.format(self.workdir))
-
-    def set_workdir(self, workdir):
-        """Set working dir for all inputs and outputs
-
-        this is the directory, where all the data are being stored to
-        """
-
-        self.workdir = workdir
-        for inpt in self.inputs:
-            inpt.workdir = workdir
-
-        for outpt in self.outputs:
-            outpt.workdir = workdir
+        raise NotImplementedError("ProcessInstance.from_json is invalid")
 
     def is_async(self, wps_request: WPSRequest):
         """Check and return if the request is async
@@ -295,6 +126,92 @@ class ProcessInstance(object):
 
                 return True
         return False
+
+# TODO: Private
+class ProcessInstance(object):
+    """
+    Process instance that is used in hander.
+    """
+
+    def __init__(self, spec, wps_request):
+        self._spec = deepcopy(spec)
+
+        # Do not initialise until actual run
+        self.workdir = None
+
+        self.wps_request = WPSExecuteRequest(spec, wps_request)
+        self.wps_response = WPSExecuteResponse(spec, wps_request)
+
+    # Override getattr to ensure similar behaviour than previous process
+    def __getattr__(self, item):
+        # Forward in spec
+        return getattr(self._spec, item)
+
+    @property
+    def uuid(self):
+        return self.wps_request.request.uuid
+
+    # Used to store the request for latter run
+    @property
+    def json(self):
+        raise NotImplementedError("ProcessInstance.json is invalid")
+
+    def from_json(self, *args, **kwargs):
+        raise NotImplementedError("ProcessInstance.from_json is invalid")
+
+    @property
+    def status_location(self):
+        base_url = configuration.get_config_value('server', 'url').rstrip('/')
+        return f'{base_url}/status?uuid={self.uuid}'
+
+    @property
+    def status_filename(self):
+        return str(self.uuid) + '.xml'
+
+    @property
+    def status_url(self):
+        return self.status_location
+
+    def run(self):
+        workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
+        self.workdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
+
+        self.wps_response.set_workdir(self.workdir)
+        self.wps_request.set_workdir(self.workdir)
+
+        self._set_grass(self.wps_request)
+        # if required set HOME to the current working directory.
+        if config.get_config_value('server', 'sethomedir') is True:
+            os.environ['HOME'] = self.workdir
+            LOGGER.info('Setting HOME to current working directory: {}'.format(os.environ['HOME']))
+        LOGGER.debug('ProcessID={}, HOME={}'.format(self.uuid, os.environ.get('HOME')))
+        self.wps_response._update_status(WPS_STATUS.STARTED, 'PyWPS Process started', 0)
+        self.handler(self.wps_request, self.wps_response)  # the user must update the wps_response.
+        # Ensure process termination
+        if self.wps_response.status != WPS_STATUS.SUCCEEDED and self.wps_response.status != WPS_STATUS.FAILED:
+            # if (not wps_response.status_percentage) or (wps_response.status_percentage != 100):
+            LOGGER.debug('Updating process status to 100% if everything went correctly')
+            self.wps_response._update_status(WPS_STATUS.SUCCEEDED, f'PyWPS Process {self.title} finished', 100)
+
+        self.clean()
+
+        return self.wps_response
+
+    def clean(self):
+        """Clean the process working dir and other temporary files
+        """
+        if config.get_config_value('server', 'cleantempdir'):
+            LOGGER.info("Removing temporary working directory: {}".format(self.workdir))
+            try:
+                if os.path.isdir(self.workdir):
+                    shutil.rmtree(self.workdir)
+                if self._grass_mapset and os.path.isdir(self._grass_mapset):
+                    LOGGER.info("Removing temporary GRASS GIS mapset: {}".format(self._grass_mapset))
+                    shutil.rmtree(self._grass_mapset)
+            except Exception as err:
+                LOGGER.error('Unable to remove directory: {}'.format(err))
+        else:
+            LOGGER.warning('Temporary working directory is not removed: {}'.format(self.workdir))
 
     def _set_grass(self, wps_request):
         """Handle given grass_location parameter of the constructor
@@ -397,44 +314,44 @@ class ProcessInstance(object):
                          os.environ.get('GISRC'), os.environ.get('GISBASE'),
                          dbase, location, os.path.basename(mapset_name)))
 
-    def setup_outputs_from_wps_request(self, wps_request : WPSRequest, wps_response):
-
-        outputs = []
-        for o in self.outputs:
-            requested_outputs = wps_request.outputs.get(o.identifier, None)
-            if requested_outputs is None:
-                continue
-            outputs.append(o.create(json=requested_outputs))
-
-
-        # # set as_reference to True for all the outputs specified as reference
-        # # if the output is not required to be raw
-        # if not wps_request.raw:
-        #     for wps_outpt in wps_request.outputs:
-        #
-        #         is_reference = wps_request.outputs[wps_outpt].get('asReference', 'false')
-        #         mimetype = wps_request.outputs[wps_outpt].get('mimetype', '')
-        #         if not isinstance(mimetype, str):
-        #             mimetype = ''
-        #
-        #         if is_reference.lower() == 'true':
-        #             # check if store is supported
-        #             if self.store_supported == 'false':
-        #                 raise StorageNotSupported(
-        #                     'The storage of data is not supported for this process.')
-        #
-        #             is_reference = True
-        #         else:
-        #             is_reference = False
-        #
-        #         for outpt in self.outputs:
-        #             if outpt.identifier == wps_outpt:
-        #                 o = outpt.clone()
-        #                 o.as_reference = is_reference
-        #                 if isinstance(o, ComplexOutput) and mimetype:
-        #                     data_format = [f for f in outpt.supported_formats if f.mime_type == mimetype]
-        #                     if len(data_format) == 0:
-        #                         raise InvalidParameterValue(
-        #                             f"MimeType {mimetype} not valid")
-        #                     o.data_format = data_format[0]
-        #                 wps_response.outputs[o.identifier] = o
+    # def setup_outputs_from_wps_request(self, wps_request : WPSRequest, wps_response):
+    #
+    #     outputs = []
+    #     for o in self.outputs:
+    #         requested_outputs = wps_request.outputs.get(o.identifier, None)
+    #         if requested_outputs is None:
+    #             continue
+    #         outputs.append(o.create(json=requested_outputs))
+    #
+    #
+    #     # # set as_reference to True for all the outputs specified as reference
+    #     # # if the output is not required to be raw
+    #     # if not wps_request.raw:
+    #     #     for wps_outpt in wps_request.outputs:
+    #     #
+    #     #         is_reference = wps_request.outputs[wps_outpt].get('asReference', 'false')
+    #     #         mimetype = wps_request.outputs[wps_outpt].get('mimetype', '')
+    #     #         if not isinstance(mimetype, str):
+    #     #             mimetype = ''
+    #     #
+    #     #         if is_reference.lower() == 'true':
+    #     #             # check if store is supported
+    #     #             if self.store_supported == 'false':
+    #     #                 raise StorageNotSupported(
+    #     #                     'The storage of data is not supported for this process.')
+    #     #
+    #     #             is_reference = True
+    #     #         else:
+    #     #             is_reference = False
+    #     #
+    #     #         for outpt in self.outputs:
+    #     #             if outpt.identifier == wps_outpt:
+    #     #                 o = outpt.clone()
+    #     #                 o.as_reference = is_reference
+    #     #                 if isinstance(o, ComplexOutput) and mimetype:
+    #     #                     data_format = [f for f in outpt.supported_formats if f.mime_type == mimetype]
+    #     #                     if len(data_format) == 0:
+    #     #                         raise InvalidParameterValue(
+    #     #                             f"MimeType {mimetype} not valid")
+    #     #                     o.data_format = data_format[0]
+    #     #                 wps_response.outputs[o.identifier] = o

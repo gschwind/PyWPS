@@ -7,7 +7,7 @@ import logging
 import tempfile
 from typing import Sequence, Optional, Dict
 
-from .basic import select_response_mimetype
+from .basic import select_response_mimetype, get_json_indent
 
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Request, Response
@@ -17,7 +17,8 @@ from pywps.response.status import StatusResponse
 
 import pywps
 from pywps.app.WPSRequest import WPSRequest
-from pywps.app.Process import Process
+from .Process import Process, ProcessInstance
+from .WPSExecuteResponse import WPSExecuteResponse
 import pywps.configuration as config
 
 from pywps.inout.inputs import ComplexInput, LiteralInput, BoundingBoxInput
@@ -25,8 +26,10 @@ from pywps.dblog import log_request, store_status
 from pywps.inout.storage import get_storage_instance
 from pywps.response.status import WPS_STATUS
 from pywps.response.execute import ExecuteResponse
-from pywps.response.describe import DescribeResponse
 from pywps.response.capabilities import CapabilitiesResponse
+
+from pywps.response.describe import DescribeResponse
+
 from pywps import dblog
 from pywps.exceptions import (StorageNotSupported, OperationNotSupported, MissingParameterValue, FileURLNotSupported,
                               ServerBusy, NoApplicableCode,
@@ -93,8 +96,8 @@ class Service(object):
     def get_capabilities(self, http_request, wps_request, uuid):
         return CapabilitiesResponse(http_request, wps_request, uuid, version=wps_request.version, processes=self.processes)
 
-    def describe(self, http_request, wps_request, uuid, identifiers):
-        return DescribeResponse(http_request, wps_request, uuid, processes=self.processes, identifiers=identifiers)
+    def describe(self, http_request, wps_request):
+        return DescribeResponse(http_request, wps_request, self.processes)
 
     # Return more or less accurate counts, if no concurrency
     def _get_accurate_process_counts(self):
@@ -116,14 +119,21 @@ class Service(object):
         :param wps_request: pywps.WPSRequest structure with parsed inputs, still in memory
         :param uuid: string identifier of the request
         """
+        mimetype = select_response_mimetype(
+            http_request.accept_mimetypes, None)
 
         LOGGER.debug('Check if the requested process exist')
-        process = self.processes.get(wps_request.identifier, None)
-        if process is None:
+        process_spec = self.processes.get(wps_request.identifier, None)
+        if process_spec is None:
             raise InvalidParameterValue("Unknown process '{}'".format(wps_request.identifier), 'Identifier')
 
+        Service._validate_request_inputs_count(process_spec, wps_request)
+
         LOGGER.debug('Check if status storage and updating are supported by this process')
-        wps_request.is_async = process.is_async(wps_request)
+        wps_request.is_async = process_spec.is_async(wps_request)
+        print("YYYY", wps_request.json)
+
+        process = ProcessInstance(process_spec, wps_request)
 
         running, stored = self._get_accurate_process_counts()
         LOGGER.debug("Running processes: {} of {} allowed running processes".format(running, self.maxparallel))
@@ -131,36 +141,35 @@ class Service(object):
 
         if wps_request.is_async:
             if running < self.maxparallel or self.maxparallel == -1:
-                # Run immediately
-                process, wps_request, wps_response = self.prepare_process_for_execution(process, wps_request, True)
-                wps_response._update_status(WPS_STATUS.ACCEPTED, "PyWPS Request accepted", 0)
+                # Run immediately asyncronously
+                process.wps_response._update_status(WPS_STATUS.ACCEPTED, "PyWPS Request accepted", 0)
                 LOGGER.debug("Accepted request {}".format(process.uuid))
-                self._run_async(process, wps_request, wps_response)
-                return wps_response
+                self._run_async(process, process.wps_request, process.wps_response)
+                return StatusResponse(process.uuid, mimetype)
 
             # try to store for later usage
             else:
                 if stored >= self.maxprocesses and self.maxprocesses != -1:
                     raise ServerBusy('Maximum number of processes in queue reached. Please try later.')
-                LOGGER.debug("Store process in job queue, uuid={}".format(process.uuid))
-                process, wps_request, wps_response = self.prepare_process_for_execution(process, wps_request, True)
-                dblog.store_process(wps_request)
-                wps_response._update_status(WPS_STATUS.ACCEPTED, 'PyWPS Process stored in job queue', 0)
-                return wps_response
+                LOGGER.debug("Store process in job queue, uuid={}".format(wps_request.uuid))
+                process.wps_response._update_status(WPS_STATUS.ACCEPTED, "PyWPS Request accepted", 0)
+                dblog.store_process(process.wps_request.raw)
+                return StatusResponse(process.uuid, mimetype)
         else:
             if running >= self.maxparallel and self.maxparallel != -1:
+                process.wps_response._update_status(WPS_STATUS.FAILED, 'Maximum number of parallel running processes reached.', 100)
                 raise ServerBusy('Maximum number of parallel running processes reached. Please try later.')
+            process.wps_response._update_status(WPS_STATUS.ACCEPTED, "PyWPS Request accepted", 0)
+            process.run()
 
-            process, wps_request, wps_response = self.prepare_process_for_execution(process, wps_request, True)
-            wps_response._update_status(WPS_STATUS.ACCEPTED, "PyWPS Request accepted", 0)
-            wps_response = process.run_process(wps_request, wps_response)
-            return wps_response
+            # TODO: Raw output
+            return StatusResponse(process.uuid, mimetype)
 
     def prepare_process_for_execution(self, process: Process, wps_request: WPSRequest, fetch_inputs=False):
         """Prepare the process identified by ``identifier`` for execution.
         """
         self._set_grass()
-        process = process.new_instance(wps_request)
+        process = ProcessInstance(process, wps_request)
         if fetch_inputs:
             wps_request = Service._parse_request_inputs(process, wps_request)
         wps_response = ExecuteResponse(wps_request, process=process, uuid=process.uuid)
@@ -184,11 +193,11 @@ class Service(object):
             request_json = request_json.decode('utf-8')
             LOGGER.debug("Launching the stored request {}".format(str(uuid)))
             wps_request = WPSRequest(json=json.loads(request_json))
-            process = self.processes.get(wps_request.identifier, None)
-            if process is None:
+            process_spec = self.processes.get(wps_request.identifier, None)
+            if process_spec is None:
                 raise InvalidParameterValue("Unknown process '{}'".format(wps_request.identifier), 'Identifier')
-            process, wps_request, wps_response = self.prepare_process_for_execution(process, wps_request, False)
-            self._run_async(process, wps_request, wps_response)
+            process = ProcessInstance(process_spec, wps_request)
+            self._run_async(process, process.wps_request, process.wps_response)
         except Exception as e:
             LOGGER.exception("Could not run stored process. {}".format(e))
             return False
@@ -212,7 +221,7 @@ class Service(object):
         # Update the actual pid of current process to check if failed latter
         dblog.update_pid(process.uuid, os.getpid())
         try:
-            wps_response = process.run_process(wps_request, wps_response)
+            wps_response = process.run()
         except Exception as e:
             traceback.print_exc()
             LOGGER.debug('Retrieving file and line number where exception occurred')
@@ -274,6 +283,20 @@ class Service(object):
 
         return wps_request
 
+
+    @staticmethod
+    def _validate_request_inputs_count(process: Process, wps_request: WPSRequest):
+        # TODO: move to Process
+        LOGGER.debug('Checking if all mandatory inputs have been passed')
+        for i in process.inputs:
+            inputs_counts = len(wps_request.inputs.get(i.identifier, []))
+            if inputs_counts < i.min_occurs:
+                LOGGER.error(f'Missing parameter value: {i.identifer}')
+                raise MissingParameterValue(i.identifier, i.identifier)
+            if inputs_counts > i.max_occurs:
+                LOGGER.error(f'To much parameter value: {i.identifier}')
+                raise MissingParameterValue(i.identifier, i.identifier)
+
     def _set_grass(self):
         """Set environment variables needed for GRASS GIS support
         """
@@ -324,11 +347,8 @@ class Service(object):
         process_uuid = http_request.args.get('uuid', None)
         if process_uuid is None:
             raise NoApplicableCode("Invalid uuid for status request", code=500)
-        status = dblog.get_status_record(process_uuid)
-        if status is None:
-            raise NoApplicableCode("Invalid uuid for status request", code=500)
         mimetype = select_response_mimetype(http_request.accept_mimetypes, None)
-        return StatusResponse(status.data, mimetype)
+        return StatusResponse(process_uuid, mimetype)
 
     def _process_wps(self, http_request):
         """
@@ -350,11 +370,13 @@ class Service(object):
                 response = None
                 if wps_request.operation == 'getcapabilities':
                     response = self.get_capabilities(http_request, wps_request, wps_request.uuid)
-                    response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
+                    store_status(wps_request.uuid, WPS_STATUS.SUCCEEDED,
+                                 'Request succeed', 100)
 
                 elif wps_request.operation == 'describeprocess':
-                    response = self.describe(http_request, wps_request, wps_request.uuid, wps_request.identifiers)
-                    response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
+                    response = self.describe(http_request, wps_request)
+                    store_status(wps_request.uuid, WPS_STATUS.SUCCEEDED,
+                                 'Request succeed', 100)
 
                 elif wps_request.operation == 'execute':
                     response = self.execute(http_request, wps_request)

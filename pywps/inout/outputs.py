@@ -30,7 +30,7 @@ class BoundingBoxOutput(IOHandler):
         if json is not None:
             self.workdir = self.workdir or json.get('workdir', None)
 
-            self.crs = json.get('crs', self.spec.crss[0])
+            self.crs = json.get('crs', None) or self.spec.crss[0]
             if self.crs not in self.spec.crss:
                 raise InvalidParameterValue(f"Not supported CRS: {self.crs}")
 
@@ -62,8 +62,9 @@ class BoundingBoxOutput(IOHandler):
         if self._iohandler:
             o['data'] = self.data
 
+        return o
 
-    # Used for serialisation and within the excecute template.
+    # Used for serialisation and within the execute template.
     @property
     def json(self):
         """Get JSON representation of the output
@@ -73,6 +74,18 @@ class BoundingBoxOutput(IOHandler):
     @classmethod
     def from_json(cls, json_output):
         raise NotImplementedError("Use BoundingBoxOutput.__init__ instead")
+
+    @property
+    def ll(self):
+        if self.data:
+            return self.data[:2]
+        return []
+
+    @property
+    def ur(self):
+        if self.data:
+            return self.data[2:]
+        return []
 
 
 class ComplexOutput(IOHandler):
@@ -104,12 +117,12 @@ class ComplexOutput(IOHandler):
 
         if self.mimetype is None:
             self.data_format = spec.supported_formats[0]
+            self.mimetype = self.data_format.mime_type
         else:
             self.data_format = spec.get_format(self.mimetype)
             if self.data_format is None:
                 raise InvalidParameterValue(
-                    'Invalid mimetype value {} for input {}'.format(
-                        json.get('mimeType'), spec.identifier),
+                    f'Invalid mimeType value {self.mimetype} for input {spec.identifier}',
                     'mimeType')
 
         # Initialize IOHandler
@@ -289,12 +302,12 @@ class ReferenceOutput(StorageHandler):
 
         if self.mimetype is None:
             self.data_format = spec.supported_formats[0]
+            self.mimetype = self.data_format.mime_type
         else:
             self.data_format = spec.get_format(self.mimetype)
             if self.data_format is None:
                 raise InvalidParameterValue(
-                    'Invalid mimeType value {} for input {}'.format(
-                        json.get('mimeType'), spec.identifier),
+                    f'Invalid mimeType value {self.mimetype} for input {spec.identifier}',
                     'mimeType')
 
     # TODO: if storage init storage
@@ -303,9 +316,9 @@ class ReferenceOutput(StorageHandler):
         # Store actual request data.
         return {
             # Required for output template
-            'mimetype': self.mimetype,
-            'encoding': self.encoding,
-            'schema': self.schema,
+            'mimetype': self.data_format.mimetype,
+            'encoding': self.data_format.encoding,
+            'schema': self.data_format.schema,
             'data': self.export(), #< TODO: Maybe too simple
 
             'identifier': self.spec.identifier,
@@ -329,7 +342,7 @@ class ReferenceOutput(StorageHandler):
 
 
 
-class MetaFile:
+class MetaFile(StorageHandler):
     """MetaFile object."""
 
     def __init__(self, identity=None, description=None, fmt=None):
@@ -346,12 +359,6 @@ class MetaFile:
         holds a number of `MetaFile` instances.
         """
         self._size = None
-        self._output = ComplexOutput(
-            identifier=identity or '',
-            title=description or '',
-            as_reference=True,
-            supported_formats=[fmt, ],
-        )
 
     def _set_workdir(self, workdir):
         self._output.workdir = workdir
@@ -398,46 +405,13 @@ class MetaFile:
 
     @property
     def urls(self):
-        js = self._output.json
-        return [js.get('href', ''), ]
+        return [self.export()]
 
     @property
     def mediatype(self):
         """Multipurpose Internet Mail Extensions (MIME) media type
         [RFC4288] of the metadata file available at the IRI."""
         return self._output.data_format.mime_type
-
-    @property
-    def data(self):
-        return self._output.data
-
-    @data.setter
-    def data(self, value):
-        self._output.data = value
-
-    @property
-    def file(self):
-        return self._output.file
-
-    @file.setter
-    def file(self, value):
-        self._output.file = value
-
-    @property
-    def url(self):
-        return self._output.url
-
-    @url.setter
-    def url(self, value):
-        self._output.url = value
-
-    @property
-    def stream(self):
-        return self._output.stream
-
-    @stream.setter
-    def stream(self, value):
-        self._output.stream = value
 
     def __str__(self):
         out = "MetaFile {}:".format(self.name)

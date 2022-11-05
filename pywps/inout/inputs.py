@@ -32,8 +32,7 @@ class BoundingBoxInput(basic.IOHandler):
         super().__init__(spec, *args, **kwargs)
 
         self.workdir = self.workdir or json.get('workdir', None)
-
-        self.crs = json.get('crs', self.spec.crss[0])
+        self.crs = json.get('crs', None) or self.spec.crss[0]
         if self.crs not in self.spec.crss:
             raise InvalidParameterValue(f"Not supported CRS: {self.crs}")
 
@@ -190,6 +189,7 @@ class LiteralInput(basic.IOHandler):
         if self.spec.uoms is not None and len(self.spec.uoms) > 0:
             default_uom = self.spec.uoms[0]
         self.uom = json.get('uom', default_uom)
+        print("XXXXX", self.uom)
         if isinstance(self.uom, str):
             self.uom = UOM(self.uom)
         elif isinstance(self.uom, dict):
@@ -210,7 +210,6 @@ class LiteralInput(basic.IOHandler):
     def json(self):
         """Get JSON representation of the input
         """
-
         return {
             # Required for lineage=True
             'uom': None if self.uom is None else self.uom.json,

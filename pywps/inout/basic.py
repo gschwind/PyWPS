@@ -853,15 +853,11 @@ class StorageHandler(object):
     >>> assert isinstance(ioh_stream.stream, RawIOBase)
     """
 
-    def __init__(self, spec, as_reference=False):
-
+    def __init__(self, spec):
         # Lazy creation of the storage
         self._storage = None
         # Read only
         self._spec = spec
-
-        # TODO: Clarify intent
-        self.as_reference = as_reference
 
 
     @property
@@ -877,7 +873,6 @@ class StorageHandler(object):
         """Return the source type."""
         # For backward compatibility only. source_type checks could be replaced by `isinstance`.
         return getattr(SOURCE_TYPE, self.prop.upper())
-
 
     def _build_file_name(self, href=''):
         """Return a file name for the local system."""

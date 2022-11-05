@@ -41,32 +41,30 @@ class WPSRequest(object):
         if "json" in kwargs:
             self.json = kwargs["json"]
             return
+        elif "http_request" in kwargs:
+            # Generate uuid if not loaded from json
+            self.uuid = uuid.uuid1()
 
-        # Generate uuid if not loaded from json
-        self.uuid = uuid.uuid1()
-
-        self.is_async = False
-        self.operation = None
-        self.version = None
-        self.api = None
-        self.default_mimetype = None
-        self.language = None
-        self.identifier = None
-        self.identifiers = None
-        self.store_execute = None
-        self.status = None
-        self.lineage = None
-        self.inputs = {}
-        self.output_ids = None
-        self.outputs = {}
-        self.raw = None
-        self.WPS = None
-        self.OWS = None
-        self.xpath_ns = None
-        self.preprocess_request = None
-        self.preprocess_response = None
-
-        if "http_request" in kwargs:
+            self.is_async = False
+            self.operation = None
+            self.version = None
+            self.api = None
+            self.default_mimetype = None
+            self.language = None
+            self.identifier = None
+            self.identifiers = None
+            self.store_execute = None
+            self.status = None
+            self.lineage = None
+            self.inputs = dict()
+            self.output_ids = None
+            self.outputs = dict()
+            self.raw = None
+            self.WPS = None
+            self.OWS = None
+            self.xpath_ns = None
+            self.preprocess_request = None
+            self.preprocess_response = None
             http_request = kwargs["http_request"]
             d = parse_http_url(http_request)
             self.operation = d.get('operation')
@@ -76,6 +74,8 @@ class WPSRequest(object):
             self.default_mimetype = d.get('default_mimetype')
             request_parser = self._get_request_parser_method(http_request.method)
             request_parser(http_request)
+        else:
+            raise NotImplementedError("Cannot construct WPSRequest from nothing")
 
     def _get_request_parser_method(self, method):
 
@@ -469,7 +469,7 @@ class WPSRequest(object):
             'store_execute': self.store_execute,
             'status': self.status,
             'lineage': self.lineage,
-            'inputs': dict((i, [inpt.json for inpt in self.inputs[i]]) for i in self.inputs),
+            'inputs': self.inputs,
             'outputs': self.outputs,
             'raw': self.raw,
             'is_async': self.is_async
@@ -502,20 +502,8 @@ class WPSRequest(object):
         self.lineage = value.get('lineage', False)
         self.outputs = value.get('outputs')
         self.raw = value.get('raw', False)
-
-        self.inputs = dict()
-        xinputs = value.get('inputs', dict())
-        for x in self.spec.inputs:
-            if x.identifier not in xinputs:
-                continue
-            self.inputs[x.identifier] = x.deserialize_list(xinputs[x.identifier])
-
-        self.outputs = dict()
-        xoutputs = value.get('outputs', dict())
-        for x in self.spec.outputs:
-            if x.identifier not in xoutputs:
-                continue
-            self.outputs[x.identifier] = x.deserialize(xoutputs[x.identifier])
+        self.inputs = value.get('inputs', dict())
+        self.outputs = value.get('outputs', dict())
 
 # convert XML inputs into python dictionary
 def get_inputs_from_xml(doc):
@@ -536,7 +524,7 @@ def get_inputs_from_xml(doc):
             inpt['type'] = 'literal'
             inpt['identifier'] = identifier_el.text
             inpt['data'] = str(value_el.text)
-            inpt['uom'] = value_el.attrib.get('uom', '')
+            inpt['uom'] = value_el.attrib.get('uom', None)
             inpt['datatype'] = value_el.attrib.get('datatype', '')
             the_inputs[identifier].append(inpt)
             continue
@@ -654,7 +642,7 @@ def get_inputs_from_json(jdoc):
             if data_type == 'literal':
                 inpt['type'] = 'literal'
                 inpt['data'] = inpt_def.get('data')
-                inpt['uom'] = inpt_def.get('uom', '')
+                inpt['uom'] = inpt_def.get('uom', None)
                 inpt['datatype'] = inpt_def.get('datatype', '')
                 the_inputs[identifier].append(inpt)
             elif data_type == 'complex':
@@ -677,8 +665,11 @@ def get_inputs_from_json(jdoc):
                 the_inputs[identifier].append(inpt)
             elif data_type == 'bbox':
                 inpt['type'] = 'bbox'
-                inpt['data'] = inpt_def['bbox']
-                inpt['crs'] = inpt_def.get('crs', 'urn:ogc:def:crs:EPSG::4326')
+                if 'data' in inpt_def:
+                    inpt['data'] = inpt_def['data']
+                else:
+                    inpt['data'] = inpt_def['bbox']
+                inpt['crs'] = inpt_def.get('crs', None)
                 inpt['dimensions'] = inpt_def.get('dimensions', 2)
                 the_inputs[identifier].append(inpt)
     return the_inputs
@@ -699,9 +690,9 @@ def get_output_from_dict(output_ids, raw):
         outpt = {}
         outpt[identifier] = ''
         outpt['mimetype'] = output_el.get('mimeType', None)
-        outpt['encoding'] = output_el.get('encoding', '')
-        outpt['schema'] = output_el.get('schema', '')
-        outpt['uom'] = output_el.get('uom', '')
+        outpt['encoding'] = output_el.get('encoding', None)
+        outpt['schema'] = output_el.get('schema', None)
+        outpt['uom'] = output_el.get('uom', None)
         if not raw:
             outpt['asReference'] = output_el.get('asReference', 'false')
         the_output[identifier] = outpt
@@ -744,16 +735,22 @@ def get_data_from_kvp(data):
 
 
 # Read KVP into python dictionnary
-def get_input_from_kvp(data : str):
+def get_input_from_kvp(data):
     """Get execute DataInputs and ResponseDocument from URL (key-value-pairs) encoding
     :param data: key:value pair list of the datainputs and responseDocument parameter
     """
+    if data is None:
+        return None
+
     d = dict()
     for e in get_data_from_kvp(data):
         d.get(e['identifier'], list()).append(e)
     return d
 
-def get_output_from_kvp(data : str):
+def get_output_from_kvp(data):
+    if data is None:
+        return None
+
     d = dict()
     for e in get_data_from_kvp(data):
         d[e['identifier']] = e

@@ -12,7 +12,6 @@ class MultipleOutputs(Process):
         outputs = [
             ComplexOutput('output', 'Metalink4 output',
                           abstract='A metalink file storing URIs to multiple files',
-                          as_reference=True,
                           supported_formats=[FORMATS.META4])
         ]
 

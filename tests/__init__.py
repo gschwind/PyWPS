@@ -16,7 +16,6 @@ from tests import test_capabilities
 from tests import test_describe
 from tests import test_execute
 from tests import test_exceptions
-from tests import test_inout
 from tests import test_literaltypes
 from tests import validator
 from tests import test_ows
@@ -77,7 +76,6 @@ def load_tests(loader=None, tests=None, pattern=None):
         test_capabilities.load_tests(),
         test_execute.load_tests(),
         test_describe.load_tests(),
-        test_inout.load_tests(),
         test_exceptions.load_tests(),
         test_ows.load_tests(),
         test_literaltypes.load_tests(),

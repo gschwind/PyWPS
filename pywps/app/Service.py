@@ -131,7 +131,6 @@ class Service(object):
 
         LOGGER.debug('Check if status storage and updating are supported by this process')
         wps_request.is_async = process_spec.is_async(wps_request)
-        print("YYYY", wps_request.json)
 
         process = ProcessInstance(process_spec, wps_request)
 

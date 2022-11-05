@@ -32,8 +32,6 @@ class StatusResponse(Response):
         )
         template_env.globals.update(get_translation=get_translation)
 
-        print(status.data)
-
         if mimetype == 'application/json':
             doc = json.dumps(self._render_json_response(status.data), cls=ArrayEncoder, indent=get_json_indent())
         else:

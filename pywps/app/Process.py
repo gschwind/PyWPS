@@ -173,8 +173,11 @@ class ProcessInstance(object):
         return self.status_location
 
     def run(self):
-        workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
-        self.workdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
+
+        # Allow to override workdir in test
+        if self.workdir is None:
+            workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
+            self.workdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
 
         self.wps_response.set_workdir(self.workdir)
         self.wps_request.set_workdir(self.workdir)

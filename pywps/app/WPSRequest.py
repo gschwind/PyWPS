@@ -41,30 +41,32 @@ class WPSRequest(object):
         if "json" in kwargs:
             self.json = kwargs["json"]
             return
-        elif "http_request" in kwargs:
-            # Generate uuid if not loaded from json
-            self.uuid = uuid.uuid1()
 
-            self.is_async = False
-            self.operation = None
-            self.version = None
-            self.api = None
-            self.default_mimetype = None
-            self.language = None
-            self.identifier = None
-            self.identifiers = None
-            self.store_execute = None
-            self.status = None
-            self.lineage = None
-            self.inputs = dict()
-            self.output_ids = None
-            self.outputs = dict()
-            self.raw = None
-            self.WPS = None
-            self.OWS = None
-            self.xpath_ns = None
-            self.preprocess_request = None
-            self.preprocess_response = None
+        # Generate uuid if not loaded from json
+        self.uuid = uuid.uuid1()
+
+        self.is_async = False
+        self.operation = None
+        self.version = None
+        self.api = None
+        self.default_mimetype = None
+        self.language = None
+        self.identifier = None
+        self.identifiers = None
+        self.store_execute = None
+        self.status = None
+        self.lineage = None
+        self.inputs = dict()
+        self.output_ids = None
+        self.outputs = dict()
+        self.raw = None
+        self.WPS = None
+        self.OWS = None
+        self.xpath_ns = None
+        self.preprocess_request = None
+        self.preprocess_response = None
+
+        if "http_request" in kwargs:
             http_request = kwargs["http_request"]
             d = parse_http_url(http_request)
             self.operation = d.get('operation')
@@ -74,8 +76,7 @@ class WPSRequest(object):
             self.default_mimetype = d.get('default_mimetype')
             request_parser = self._get_request_parser_method(http_request.method)
             request_parser(http_request)
-        else:
-            raise NotImplementedError("Cannot construct WPSRequest from nothing")
+
 
     def _get_request_parser_method(self, method):
 

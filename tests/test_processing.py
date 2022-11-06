@@ -18,6 +18,8 @@ from pywps.processing.basic import MultiProcessing
 from pywps.app import WPSRequest
 from pywps.response.execute import ExecuteResponse
 
+from pywps.app.Process import ProcessInstance
+
 from .processes import Greeter, InOut, BBox
 
 
@@ -25,13 +27,15 @@ class GreeterProcessingTest(unittest.TestCase):
     """Processing test case with Greeter process"""
 
     def setUp(self):
-        self.uuid = uuid.uuid1()
-        self.dummy_process = Greeter()
-        self.dummy_process._set_uuid(self.uuid)
-        self.dummy_process.set_workdir('/tmp')
-        self.wps_request = WPSRequest()
-        self.wps_response = ExecuteResponse(self.wps_request, self.uuid,
-                                            process=self.dummy_process)
+
+        self.dummy_process = ProcessInstance(Greeter(), WPSRequest())
+
+        self.wps_request = self.dummy_process.wps_request
+        self.wps_response = self.dummy_process.wps_response
+
+        # Override workdir
+        self.dummy_process.workdir = '/tmp'
+
         self.job = Job(
             process=self.dummy_process,
             wps_request=self.wps_request,

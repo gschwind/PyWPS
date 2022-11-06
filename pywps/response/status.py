@@ -37,6 +37,7 @@ class StatusResponse(Response):
         else:
             template = template_env.get_template(status.data["version"] + '/execute/main.xml')
             doc = template.render(**status.data)
+            print("ZZZZ", doc)
         super(StatusResponse, self).__init__(response=doc, mimetype=mimetype)
 
     @staticmethod

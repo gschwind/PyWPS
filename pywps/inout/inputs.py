@@ -128,20 +128,21 @@ class ComplexInput(basic.IOHandler):
 
     # Interpret current state to initialize iohandler
     def _init_iohandler(self):
-        # Initialize input data for the user
-        if self.encoding == 'base64':
-            # FIXME: ignore data_format ?
-            self.data = base64.b64decode(self.src_data)
-        else:
-
-            # Ensure valid XML data
-            if self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
-                # FIXME: Ignore schema ?
-                # Note that in a client-server round trip, the original and returned file will not be identical.
-                data_doc = etree.parse(self.file)
-                self.data = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
-            else:
-                self.data = self.src_data
+        self.data = self.src_data
+        # # Initialize input data for the user
+        # if self.encoding == 'base64':
+        #     # FIXME: ignore data_format ?
+        #     self.data = base64.b64decode(self.src_data)
+        # else:
+        #
+        #     # Ensure valid XML data
+        #     if self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
+        #         # FIXME: Ignore schema ?
+        #         # Note that in a client-server round trip, the original and returned file will not be identical.
+        #         data_doc = etree.parse(self.file)
+        #         self.data = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
+        #     else:
+        #         self.data = self.src_data
 
 
     # Used in execute/status outputs XML if lineage=True
@@ -275,10 +276,6 @@ class ReferenceInput(basic.IOHandler):
             data[a] = getattr(self.spec, a)
 
         return data
-
-    @property
-    def json(self):
-        return self.as_json()
 
     @classmethod
     def from_json(cls, json_input):

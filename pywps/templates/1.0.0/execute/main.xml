@@ -34,29 +34,7 @@
     {% if input_definitions %}
 	<wps:DataInputs>
         {% for input in input_definitions %}
-		<wps:Input>
-            <ows:Identifier>{{ input.identifier }}</ows:Identifier>
-            <ows:Title>{{ get_translation(input, "title", language) }}</ows:Title>
-            <ows:Abstract>{{ get_translation(input, "abstract", language) }}</ows:Abstract>
-            {% if input.type == "complex" %}
-			<wps:Data>
-                    <wps:ComplexData mimeType="{{ input.mimetype }}" encoding="{{ input.encoding }}" schema="{{ input.schema }}">{{ input.data | safe }}</wps:ComplexData>
-			</wps:Data>
-            {% elif input.type == "literal" %}
-			<wps:Data>
-                <wps:LiteralData {% if input.uom %}uom="{{ input.uom.reference }}"{% endif %}>{{ input.data }}</wps:LiteralData>
-			</wps:Data>
-            {% elif input.type == "bbox" %}
-			<wps:Data>
-                <wps:BoundingBoxData crs="{{ input.crs }}" dimensions="{{ input.dimensions }}">
-                    <ows:LowerCorner>{% for c in input.ll %} {{ c }} {% endfor %}</ows:LowerCorner>
-                    <ows:UpperCorner>{% for c in input.ur %} {{ c }} {% endfor %}</ows:UpperCorner>
-                </wps:BoundingBoxData>
-			</wps:Data>
-            {% elif input.type == "reference" %}
-            <wps:Reference xlink:href="{{ input.href }}" method="{{ input.method }}" mimeType="{{ input.mimetype }}" encoding="{{ input.encoding }}" schema="{{ input.schema }}"/>
-            {% endif %}
-		</wps:Input>
+        {{ input }}
         {% endfor %}
 	</wps:DataInputs>
     {% endif %}

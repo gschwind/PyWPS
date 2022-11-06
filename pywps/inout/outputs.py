@@ -40,9 +40,9 @@ class BoundingBoxOutput(IOHandler):
             if 'data' in json:
                 self.data = json['data']
 
-    def as_json(self):
+    def as_json_for_template(self):
         o = {
-            # Required for lineage=True
+            'type': BoundingBoxOutput.type, # Used to select which template to use
             'crs': self.crs,
             'dimensions': self.dimensions,
             'll': self.ll,
@@ -52,24 +52,19 @@ class BoundingBoxOutput(IOHandler):
             'title': self.spec.title,
             'abstract': self.spec.abstract,
             'translations': self.spec.translations,
-
-            # Required for serialization
-            'type': BoundingBoxOutput.type,
-            'workdir': self.workdir
         }
 
         # TODO: make data in the good format
-        if self._iohandler:
-            o['data'] = self.data
+        # Not needed ll and ur are used
+        # if self._iohandler:
+        #     o['data'] = self.data
 
         return o
 
     # Used for serialisation and within the execute template.
     @property
     def json(self):
-        """Get JSON representation of the output
-        """
-        return self.as_json()
+        raise NotImplementedError("Do not use")
 
     @classmethod
     def from_json(cls, json_output):
@@ -106,9 +101,13 @@ class ComplexOutput(IOHandler):
     """
 
     # TODO: doc string
+
+    # Created from WPSRequest outputs data
+    # /!\ Aren't serialisable
     def __init__(self, spec, json, *args, workdir=None, **kwargs):
         super().__init__(spec, *args, workdir=workdir, **kwargs)
 
+        # TODO: request may override title and abstract
         self.mimetype = json.get('mimetype', None)
         self.encoding = json.get('encoding', None)
         self.schema = json.get('schema', None)
@@ -125,77 +124,48 @@ class ComplexOutput(IOHandler):
                     f'Invalid mimeType value {self.mimetype} for input {spec.identifier}',
                     'mimeType')
 
-        # Initialize IOHandler
-        if 'data' in json:
-            self.data = json['data']
-
-    def as_json(self):
-        # Store actual request data.
-        return {
-            # Required for output template
+    def as_json_for_template(self):
+        o = {
+            'type': ComplexOutput.type, # Used to select which template to use
             'mimetype': self.mimetype,
             'encoding': self.encoding,
             'schema': self.schema,
-            'data': self.data, #< TODO: Maybe too simple
-
             'identifier': self.spec.identifier,
             'title': self.spec.title,
             'abstract': self.spec.abstract,
             'translations': self.spec.translations,
-
-            # Required for serialization
-            'type': ComplexOutput.type,
-            'workdir': self.workdir
         }
-
-    @property
-    def json(self):
-        return self.as_json()
+        self._encode_data_for_template(o)
+        return o
 
     @classmethod
     def from_json(cls, json_output):
         raise NotImplementedError("Use ComplexOutput.__init__ instead")
 
-
-    # FIXME: TODO
-    def _data(self):
-        if self.data:
-            if self.data_format.mime_type in [FORMATS.GEOJSON.mime_type, FORMATS.JSON.mime_type]:
-                return self.data
-            elif self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
-                # Note that in a client-server round trip, the original and returned file will not be identical.
-                data_doc = etree.parse(self.file)
-                return etree.tostring(data_doc, pretty_print=True).decode('utf-8')
-
+    def _encode_data_for_template(self, data):
+        if self.data_format.mime_type in [FORMATS.GEOJSON.mime_type, FORMATS.JSON.mime_type]:
+            import json
+            data['data'] = self.data
+            return
+        elif self.data_format.mime_type in ["application/xml", "application/gml+xml", "text/xml"]:
+            # Note that in a client-server round trip, the original and returned file will not be identical.
+            data_doc = etree.parse(self.file)
+            data['data'] = etree.tostring(data_doc, pretty_print=True).decode('utf-8')
+            return
+        else:
+            if self.data_format.encoding == 'base64':
+                data['data'] = self.base64.decode('utf-8')
+                return
             else:
-                if self.data_format.encoding == 'base64':
-                    return self.base64.decode('utf-8')
-                else:
-                    # Match only data that are safe CDATA pattern.
-                    CDATA_PATTERN = re.compile(r'^<!\[CDATA\[((?!\]\]>).)*\]\]>$')
+                # Match only data that are safe CDATA pattern.
+                CDATA_PATTERN = re.compile(r'^<!\[CDATA\[((?!\]\]>).)*\]\]>$')
 
-                    # Otherwise we assume all other formats are unsafe and need to be enclosed in a CDATA tag.
-                    if isinstance(self.data, bytes):
-                        # Try to inline data as text but if fail encode is in base64
-                        if self.data_format.encoding == 'utf-8':
-                            out = self.data.decode('utf-8')
-                            # If data is already enclosed with CDATA pattern, do not add it twice
-                            if CDATA_PATTERN.match(out):
-                                data["data"] = out
-                            else:
-                                # Check if the data does not contain ]]> patern if is safe to use CDATA
-                                # other wise we fallback to base64 encoding.
-                                if not re.search('\\]\\]>', out):
-                                    data["data"] = '<![CDATA[{}]]>'.format(out)
-                                else:
-                                    data['encoding'] = 'base64'  # override the unsafe encoding
-                                    data["data"] = self.base64.decode('utf-8')
-                        else:
-                            data['encoding'] = 'base64'  # override the unsafe encoding
-                            data["data"] = self.base64.decode('utf-8')
-                    else:
-                        out = str(self.data)
-                        # If data is already enclose with CDATApatern do not add it twise
+                # Otherwise we assume all other formats are unsafe and need to be enclosed in a CDATA tag.
+                if isinstance(self.data, bytes):
+                    # Try to inline data as text but if fail encode is in base64
+                    if self.data_format.encoding == 'utf-8':
+                        out = self.data.decode('utf-8')
+                        # If data is already enclosed with CDATA pattern, do not add it twice
                         if CDATA_PATTERN.match(out):
                             data["data"] = out
                         else:
@@ -206,8 +176,24 @@ class ComplexOutput(IOHandler):
                             else:
                                 data['encoding'] = 'base64'  # override the unsafe encoding
                                 data["data"] = self.base64.decode('utf-8')
+                    else:
+                        data['encoding'] = 'base64'  # override the unsafe encoding
+                        data["data"] = self.base64.decode('utf-8')
+                else:
+                    out = str(self.data)
+                    # If data is already enclose with CDATApatern do not add it twise
+                    if CDATA_PATTERN.match(out):
+                        data["data"] = out
+                    else:
+                        # Check if the data does not contain ]]> patern if is safe to use CDATA
+                        # other wise we fallback to base64 encoding.
+                        if not re.search('\\]\\]>', out):
+                            data["data"] = '<![CDATA[{}]]>'.format(out)
+                        else:
+                            data['encoding'] = 'base64'  # override the unsafe encoding
+                            data["data"] = self.base64.decode('utf-8')
 
-        return data
+        return
 
 
 class LiteralOutput(IOHandler):
@@ -261,15 +247,13 @@ class LiteralOutput(IOHandler):
                 return u
         return None
 
-
-
-    @property
-    def json(self):
+    def as_json_for_template(self):
         """Get JSON representation of the input
         """
 
         return {
-            # Used by execute template
+            'type': LiteralOutput.type, # Used to select which template to use
+
             'uom': None if self.uom is None else self.uom.json,
             'data': self.data, #< TODO: To simple for now
 
@@ -278,11 +262,11 @@ class LiteralOutput(IOHandler):
             'abstract': self.spec.abstract,
             'data_type': self.spec.data_type,
             'translations': self.spec.translations,
-
-            # Required for serialization
-            'type': LiteralOutput.type,
-            'workdir': self.workdir
         }
+
+    @property
+    def json(self):
+        raise NotImplementedError("Do not use LiteralOutput.json")
 
     @classmethod
     def from_json(cls, json_output):
@@ -311,11 +295,10 @@ class ReferenceOutput(StorageHandler):
                     'mimeType')
 
     # TODO: if storage init storage
-
-    def as_json(self):
-        # Store actual request data.
+    def as_json_for_template(self):
         return {
-            # Required for output template
+            'type': ReferenceOutput.type, # Used to select which template to use
+
             'mimetype': self.data_format.mimetype,
             'encoding': self.data_format.encoding,
             'schema': self.data_format.schema,
@@ -326,15 +309,12 @@ class ReferenceOutput(StorageHandler):
             'abstract': self.spec.abstract,
             'translations': self.spec.translations,
 
-            # Required for serialization
-            'type': ComplexOutput.type,
             'workdir': self.workdir,
-            # 'uuid': self._uuid
         }
 
     @property
     def json(self):
-        return self.as_json()
+        raise NotImplementedError("Do not use LiteralOutput.json")
 
     @classmethod
     def from_json(cls, json_input):

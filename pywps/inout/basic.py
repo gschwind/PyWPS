@@ -937,7 +937,9 @@ class StorageHandler(object):
 
     @property
     def data(self):
-        raise NotImplementedError("StorageHandler.data is not available")
+        # Is this expected for an outputs ?
+        with self.storage.open("r") as f:
+            return f.read()
 
     @data.setter
     def data(self, value):

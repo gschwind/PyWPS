@@ -511,6 +511,7 @@ def get_inputs_from_xml(doc):
     version = get_version_from_ns(doc.nsmap[doc.prefix])
     xpath_ns = get_xpath_ns(version)
     for input_el in xpath_ns(doc, '/wps:Execute/wps:DataInputs/wps:Input'):
+        input_lineage = etree.tostring(input_el, encoding="utf-8").decode("utf-8")
         [identifier_el] = xpath_ns(input_el, './ows:Identifier')
         identifier = identifier_el.text
 
@@ -522,6 +523,7 @@ def get_inputs_from_xml(doc):
             value_el = literal_data[0]
             inpt = {}
             inpt['type'] = 'literal'
+            inpt['lineage'] = input_lineage
             inpt['identifier'] = identifier_el.text
             inpt['data'] = str(value_el.text)
             inpt['uom'] = value_el.attrib.get('uom', None)
@@ -534,10 +536,11 @@ def get_inputs_from_xml(doc):
             complex_data_el = complex_data[0]
             inpt = {}
             inpt['type'] = 'complex'
+            inpt['lineage'] = input_lineage
             inpt['identifier'] = identifier_el.text
             inpt['mimeType'] = complex_data_el.attrib.get('mimeType', None)
-            inpt['encoding'] = complex_data_el.attrib.get('encoding', '').lower()
-            inpt['schema'] = complex_data_el.attrib.get('schema', '')
+            inpt['encoding'] = complex_data_el.attrib.get('encoding', None)
+            inpt['schema'] = complex_data_el.attrib.get('schema', None)
             inpt['method'] = complex_data_el.attrib.get('method', 'GET')
             if len(complex_data_el.getchildren()) > 0:
                 value_el = complex_data_el[0]
@@ -553,6 +556,7 @@ def get_inputs_from_xml(doc):
             reference_data_el = reference_data[0]
             inpt = {}
             inpt['type'] = 'reference'
+            inpt['lineage'] = input_lineage
             inpt['identifier'] = identifier_el.text
             inpt[identifier_el.text] = reference_data_el.text
             inpt['href'] = reference_data_el.attrib.get(
@@ -583,6 +587,7 @@ def get_inputs_from_xml(doc):
                     bbox.minx, bbox.miny, bbox.maxx, bbox.maxy))
                 inpt = {}
                 inpt['type'] = 'bbox'
+                inpt['lineage'] = input_lineage
                 inpt['identifier'] = identifier_el.text
                 inpt['data'] = [bbox.minx, bbox.miny, bbox.maxx, bbox.maxy]
                 inpt['crs'] = bbox.crs.getcodeurn() if bbox.crs else None
@@ -648,10 +653,10 @@ def get_inputs_from_json(jdoc):
             elif data_type == 'complex':
                 inpt['type'] = 'complex'
                 inpt['mimeType'] = inpt_def.get('mimeType', None)
-                inpt['encoding'] = inpt_def.get('encoding', '').lower()
-                inpt['schema'] = inpt_def.get('schema', '')
+                inpt['encoding'] = inpt_def.get('encoding', None)
+                inpt['schema'] = inpt_def.get('schema', None)
                 inpt['method'] = inpt_def.get('method', 'GET')
-                inpt['data'] = _get_rawvalue_value(inpt_def.get('data', ''), inpt['encoding'])
+                inpt['data'] = inpt_def.get('data', '')
                 the_inputs[identifier].append(inpt)
             elif data_type == 'reference':
                 inpt[identifier] = inpt_def
@@ -659,9 +664,9 @@ def get_inputs_from_json(jdoc):
                 inpt['href'] = inpt_def.get('href', '')
                 inpt['mimeType'] = inpt_def.get('mimeType', None)
                 inpt['method'] = inpt_def.get('method', 'GET')
-                inpt['header'] = inpt_def.get('header', '')
-                inpt['body'] = inpt_def.get('body', '')
-                inpt['bodyreference'] = inpt_def.get('bodyreference', '')
+                inpt['header'] = inpt_def.get('header', None)
+                inpt['body'] = inpt_def.get('body', None)
+                inpt['bodyreference'] = inpt_def.get('bodyreference', None)
                 the_inputs[identifier].append(inpt)
             elif data_type == 'bbox':
                 inpt['type'] = 'bbox'

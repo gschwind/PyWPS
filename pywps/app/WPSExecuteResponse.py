@@ -197,28 +197,16 @@ class WPSExecuteResponse(object):
         elif self.status == WPS_STATUS.SUCCEEDED:
             data["status"] = self._process_succeeded()
             # Process outputs XML
-            print(self.outputs)
-            data["outputs"] = [o.json for o in self.outputs.values()]
+            print("UUUUU", self.outputs)
+            data["outputs"] = [o.as_json_for_template() for o in self.outputs.values()]
         # lineage: add optional lineage when process has finished
-        if self.status in [WPS_STATUS.SUCCEEDED, WPS_STATUS.FAILED]:
+        if self.status in {WPS_STATUS.SUCCEEDED, WPS_STATUS.FAILED}:
             # DataInputs and DataOutputs definition XML if lineage=true
             if self.wps_request.lineage == 'true':
                 data["lineage"] = True
-
-                xinputs = list()
-                for i in self.spec.inputs:
-                    if i.identifier in self.wps_request.inputs:
-                        l = deepcopy(self.wps_request.inputs[i.identifier])
-                        for x in l:
-                            x.update({
-                                'identifier': i.identifier,
-                                'title': i.title,
-                                'abstract': i.abstract,
-                                'translations': i.translations
-                            })
-                        xinputs += l
-                data["input_definitions"] = xinputs
-
+                data["input_definitions"] = \
+                    sum(x['lineage'] for x in self.wps_request.inputs.values())
+                print("TTTT", data["input_definitions"])
                 xoutputs = list()
                 for i in self.spec.outputs:
                     # Expect all outputs even if not outputs where requested ?
@@ -232,7 +220,5 @@ class WPSExecuteResponse(object):
                         })
                     xoutputs += l
                 data["output_definitions"] = xoutputs
-
-
         return data
 

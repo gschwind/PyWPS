@@ -96,7 +96,12 @@ class RawInput(unittest.TestCase):
                                inputs=[('complex', ComplexDataInput(data, mimeType=fmt.mime_type,
                                                                     encoding=fmt.encoding))],
                                mode='sync')
+
+        import xml.etree.ElementTree as ET
+        print(ET.dump(doc))
+
         resp = client.post_xml('/wps', doc=doc)
+        print(resp.text)
         assert_response_success(resp)
         wps.parseResponse(resp.xml)
         out = wps.processOutputs[0].data[0]

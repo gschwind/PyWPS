@@ -224,10 +224,22 @@ class Service(object):
                 raise RuntimeError("Unknown operation {}".format(wps_request.operation))
 
         except NoApplicableCode as e:
+            import traceback
+            print("-" * 60)
+            traceback.print_exc(file=sys.stdout)
+            print("-" * 60)
             return e
         except HTTPException as e:
+            import traceback
+            print("-" * 60)
+            traceback.print_exc(file=sys.stdout)
+            print("-" * 60)
             return NoApplicableCode(e.description, code=e.code)
         except Exception:
+            import traceback
+            print("-" * 60)
+            traceback.print_exc(file=sys.stdout)
+            print("-" * 60)
             msg = "No applicable error code, please check error log."
             return NoApplicableCode(msg, code=500)
 

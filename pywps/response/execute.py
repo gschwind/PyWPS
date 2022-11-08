@@ -25,6 +25,8 @@ from pywps.response.status import WPS_STATUS
 
 from .basic import WPSResponse
 
+from pywps.dblog import get_status_record
+
 LOGGER = logging.getLogger("PYWPS")
 
 WPS, OWS = get_ElementMakerForVersion("1.0.0")
@@ -129,7 +131,10 @@ class ExecuteResponse(WPSResponse):
         return response
 
     def _construct_doc(self):
-        doc = self.wps_execute_response.as_json_for_execute_template()
+        r = get_status_record(self.wps_execute_response.uuid)
+        if not r:
+            return NoApplicableCode("Output was not generated")
+        doc = r.data
         try:
             json_response, mimetype = get_response_type(
                 self.wps_request.http_request.accept_mimetypes, self.wps_request.default_mimetype)

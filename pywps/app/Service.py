@@ -76,6 +76,15 @@ class Service(object):
             if not LOGGER.handlers:
                 LOGGER.addHandler(logging.NullHandler())
 
+    @operations("status")
+    def get_status(self, wps_request, uuid):
+        try:
+            _, mimetype = get_response_type(wps_request.http_request.accept_mimetypes,
+                                            wps_request.default_mimetype)
+        except Exception:
+            mimetype = get_default_response_mimetype()
+        return StatusResponse(wps_request.version, wps_request.requested_status_uuid, mimetype)
+
     @operations("getcapabilities")
     def get_capabilities(self, wps_request, uuid):
         response = CapabilitiesResponse(wps_request, uuid, version=wps_request.version, processes=self.processes)

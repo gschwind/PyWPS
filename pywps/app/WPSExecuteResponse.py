@@ -122,9 +122,6 @@ class WPSExecuteResponse(object):
             self.wps_request.preprocess_response = None
 
         LOGGER.debug("_update_status: status={}, clean={}".format(status, clean))
-        self._update_status_doc()
-        if self.store_status_file:
-            self._update_status_file()
         if clean:
             if self.status == WPS_STATUS.SUCCEEDED or self.status == WPS_STATUS.FAILED:
                 LOGGER.debug("clean workdir: status={}".format(status))
@@ -143,26 +140,6 @@ class WPSExecuteResponse(object):
         if status_percentage is None:
             status_percentage = self.status_percentage
         self._update_status(self.status, message, status_percentage, False)
-
-    def _update_status_doc(self):
-        try:
-            # rebuild the doc
-            self.doc = StatusResponse(self.wps_request.version, self.uuid,
-                                      get_default_response_mimetype()).get_data(as_text=True)
-            self.content_type = get_default_response_mimetype()
-        except Exception as e:
-            raise NoApplicableCode('Building Response Document failed with : {}'.format(e))
-
-    def _update_status_file(self):
-        # TODO: check if file/directory is still present, maybe deleted in mean time
-        try:
-            # update the status xml file
-            self.process.status_store.write(
-                self.doc,
-                self.process.status_filename,
-                data_format=FORMATS.XML)
-        except Exception as e:
-            raise NoApplicableCode('Writing Response Document failed with : {}'.format(e))
 
     def _process_accepted(self):
         percent = int(self.status_percentage)
@@ -232,8 +209,7 @@ class WPSExecuteResponse(object):
         }
 
         if self.store_status_file:
-            if self.process.status_location:
-                data["status_location"] = self.process.status_url
+            data["status_location"] = self.process.status_url
 
         if self.status == WPS_STATUS.ACCEPTED:
             self.message = 'PyWPS Process {} accepted'.format(self.process.identifier)

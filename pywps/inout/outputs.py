@@ -526,6 +526,7 @@ class MetaLink:
     def _load_template(self):
         from jinja2 import PackageLoader
 
+        # TODO: Use TEMPLATE_ENV directly
         from pywps.response import RelEnvironment
 
         template_env = RelEnvironment(

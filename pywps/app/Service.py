@@ -68,7 +68,7 @@ class Service(object):
     def describe(self, wps_request, uuid, identifiers):
         return DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=wps_request.identifiers)
 
-    def execute(self, identifier, wps_request, uuid):
+    def execute(self, wps_request, uuid):
         """Parse and perform Execute WPS request call
 
         :param identifier: process identifier string
@@ -76,7 +76,7 @@ class Service(object):
         :param uuid: string identifier of the request
         """
         self._set_grass()
-        process = self.prepare_process_for_execution(identifier)
+        process = self.prepare_process_for_execution(wps_request.identifier)
         return self._parse_and_execute(process, wps_request, uuid)
 
     def prepare_process_for_execution(self, identifier):
@@ -177,11 +177,7 @@ class Service(object):
                         response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
 
                     elif wps_request.operation == 'execute':
-                        response = self.execute(
-                            wps_request.identifier,
-                            wps_request,
-                            request_uuid
-                        )
+                        response = self.execute(wps_request, request_uuid)
                     return response
                 except Exception as e:
                     # This ensure that logged request get terminated in case of exception while the request is not

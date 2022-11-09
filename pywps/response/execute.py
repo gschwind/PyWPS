@@ -22,7 +22,7 @@ from pywps.exceptions import NoApplicableCode
 from pywps.inout.array_encode import ArrayEncoder
 from .basic import TEMPLATE_ENV
 from pywps.inout.formats import FORMATS
-from pywps.response.status import WPS_STATUS
+from .. import WPS_STATUS
 
 from .basic import WPSResponse
 

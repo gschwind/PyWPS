@@ -29,7 +29,7 @@ try:
 except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 
-from pywps.response.status import WPS_STATUS
+from . import WPS_STATUS
 
 LOGGER = logging.getLogger('PYWPS')
 _SESSION_MAKER = None

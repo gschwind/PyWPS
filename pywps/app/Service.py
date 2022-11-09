@@ -28,7 +28,7 @@ from pywps.exceptions import (
     NoApplicableCode,
 )
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
-from pywps.response.status import WPS_STATUS
+from .. import WPS_STATUS
 from pywps.app.basic import get_response_type, get_default_response_mimetype
 
 LOGGER = logging.getLogger("PYWPS")

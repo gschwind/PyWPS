@@ -130,7 +130,6 @@ class Process(object):
 
     def execute(self, wps_request, uuid):
         self._set_uuid(uuid)
-        self._setup_status_storage()
         self.async_ = False
         wps_response = WPSExecuteResponse(self, wps_request, self.uuid)
 
@@ -164,23 +163,6 @@ class Process(object):
 
         for outpt in self.outputs:
             outpt.uuid = uuid
-
-    def _setup_status_storage(self):
-        self._status_store = StorageBuilder.buildStorage()
-
-    @property
-    def status_store(self):
-        if self._status_store is None:
-            self._setup_status_storage()
-        return self._status_store
-
-    @property
-    def status_location(self):
-        return self.status_store.location(self.status_filename)
-
-    @property
-    def status_filename(self):
-        return str(self.uuid) + '.xml'
 
     @property
     def status_url(self):

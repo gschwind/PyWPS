@@ -87,6 +87,11 @@ OGCUNIT = {
     'feet': 'urn:ogc:def:uom:OGC:1.0:feet'
 }
 
+from collections import namedtuple
+
+_WPS_STATUS = namedtuple('WPSStatus', ['UNKNOWN', 'ACCEPTED', 'STARTED', 'PAUSED', 'SUCCEEDED', 'FAILED'])
+WPS_STATUS = _WPS_STATUS(0, 1, 2, 3, 4, 5)
+
 from pywps.app import Process, Service, WPSRequest
 from pywps.app.WPSRequest import get_inputs_from_xml, get_output_from_xml
 from pywps.inout import UOM

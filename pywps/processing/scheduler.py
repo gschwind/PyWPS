@@ -9,7 +9,7 @@ import os
 import pywps.configuration as config
 from pywps.exceptions import SchedulerNotAvailable
 from pywps.processing.basic import Processing
-from pywps.response.status import WPS_STATUS
+from .. import WPS_STATUS
 
 LOGGER = logging.getLogger("PYWPS")
 

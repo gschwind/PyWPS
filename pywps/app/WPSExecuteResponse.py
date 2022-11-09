@@ -15,7 +15,7 @@ import pywps.configuration as config
 from werkzeug.wrappers import Response
 from pywps.dblog import store_status, update_status_record
 from pywps.inout.array_encode import ArrayEncoder
-from pywps.response.status import WPS_STATUS
+from .. import WPS_STATUS
 from pywps.inout.formats import FORMATS
 from pywps.inout.outputs import ComplexOutput
 from pywps.response.execute import StatusResponse

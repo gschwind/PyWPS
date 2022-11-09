@@ -68,7 +68,9 @@ class Service(object):
         return response
 
     def describe(self, wps_request, uuid, identifiers):
-        return DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=wps_request.identifiers)
+        response = DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=wps_request.identifiers)
+        response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
+        return response
 
     def execute(self, wps_request, uuid):
         """Parse and perform Execute WPS request call
@@ -175,7 +177,6 @@ class Service(object):
 
                     elif wps_request.operation == 'describeprocess':
                         response = self.describe(wps_request, request_uuid)
-                        response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
 
                     elif wps_request.operation == 'execute':
                         response = self.execute(wps_request, request_uuid)

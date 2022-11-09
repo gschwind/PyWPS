@@ -44,6 +44,20 @@ class Service(object):
     :param cfgfiles: A list of configuration files
     """
 
+    # Decorator to register WPS operation handlers
+    class operations:
+        handlers = dict()
+
+        def __init__(self, name):
+            self.name = name
+
+        def __call__(self, func):
+            # Using function name instead of the actual function ensure that
+            # operation call wil use the derivated functions
+            self.__class__.handlers[self.name] = func.__name__
+            print(self.__class__.handlers)
+            return func
+
     def __init__(self, processes: Sequence = [], cfgfiles=None, preprocessors: Optional[Dict] = None):
         # ordered dict of processes
         self.processes = OrderedDict((p.identifier, p) for p in processes)
@@ -62,16 +76,19 @@ class Service(object):
             if not LOGGER.handlers:
                 LOGGER.addHandler(logging.NullHandler())
 
+    @operations("getcapabilities")
     def get_capabilities(self, wps_request, uuid):
         response = CapabilitiesResponse(wps_request, uuid, version=wps_request.version, processes=self.processes)
         response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
         return response
 
-    def describe(self, wps_request, uuid, identifiers):
+    @operations("describeprocess")
+    def describe(self, wps_request, uuid):
         response = DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=wps_request.identifiers)
         response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
         return response
 
+    @operations("execute")
     def execute(self, wps_request, uuid):
         """Parse and perform Execute WPS request call
 
@@ -166,21 +183,10 @@ class Service(object):
 
             wps_request = WPSRequest(http_request, self.preprocessors)
             LOGGER.info('Request: {}'.format(wps_request.operation))
-            if wps_request.operation in ['getcapabilities',
-                                         'describeprocess',
-                                         'execute']:
+            if wps_request.operation in Service.operations.handlers:
                 log_request(request_uuid, wps_request)
                 try:
-                    response = None
-                    if wps_request.operation == 'getcapabilities':
-                        response = self.get_capabilities(wps_request, request_uuid)
-
-                    elif wps_request.operation == 'describeprocess':
-                        response = self.describe(wps_request, request_uuid)
-
-                    elif wps_request.operation == 'execute':
-                        response = self.execute(wps_request, request_uuid)
-                    return response
+                    return getattr(self, Service.operations.handlers[wps_request.operation])(wps_request, request_uuid)
                 except Exception as e:
                     # This ensure that logged request get terminated in case of exception while the request is not
                     # accepted

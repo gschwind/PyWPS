@@ -301,7 +301,7 @@ class ExecuteTest(TestBase):
         self.assertTrue(service.processes['my_complex_process'])
 
         class FakeRequest():
-            identifier = 'complex_process'
+            identifier = 'my_complex_process'
             service = 'wps'
             operation = 'execute'
             version = '1.0.0'
@@ -315,7 +315,7 @@ class ExecuteTest(TestBase):
         request = FakeRequest()
 
         try:
-            service.execute('my_complex_process', request, 'fakeuuid')
+            service.execute(request, 'fakeuuid')
         except InvalidParameterValue as e:
             self.assertEqual(e.locator, 'mimeType')
 

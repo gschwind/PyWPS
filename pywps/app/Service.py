@@ -63,7 +63,9 @@ class Service(object):
                 LOGGER.addHandler(logging.NullHandler())
 
     def get_capabilities(self, wps_request, uuid):
-        return CapabilitiesResponse(wps_request, uuid, version=wps_request.version, processes=self.processes)
+        response = CapabilitiesResponse(wps_request, uuid, version=wps_request.version, processes=self.processes)
+        response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
+        return response
 
     def describe(self, wps_request, uuid, identifiers):
         return DescribeResponse(wps_request, uuid, processes=self.processes, identifiers=wps_request.identifiers)
@@ -170,7 +172,6 @@ class Service(object):
                     response = None
                     if wps_request.operation == 'getcapabilities':
                         response = self.get_capabilities(wps_request, request_uuid)
-                        response._update_status(WPS_STATUS.SUCCEEDED, '', 100)
 
                     elif wps_request.operation == 'describeprocess':
                         response = self.describe(wps_request, request_uuid)

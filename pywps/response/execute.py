@@ -115,7 +115,7 @@ class StatusResponse(Response):
         else:
             template = TEMPLATE_ENV.get_template(version + '/execute/main.xml')
             doc = template.render(**r.data)
-
+        print(doc)
         super().__init__(doc, mimetype=mimetype)
 
     @staticmethod

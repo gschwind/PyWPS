@@ -29,6 +29,7 @@ class DBLogTest(unittest.TestCase):
     def test_db_content(self):
         session = get_session()
         null_time_end = session.query(ProcessInstance).filter(ProcessInstance.time_end == None)
+        print([[k+'='+str(getattr(x, k)) for k in x.__dict__.keys()] for x in null_time_end.all()])
         self.assertEqual(null_time_end.count(), 0,
                          'There are no unfinished processes loged')
 

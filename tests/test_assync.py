@@ -38,6 +38,7 @@ class ExecuteTest(unittest.TestCase):
                                mode='async')
 
         resp = client.post_xml(doc=doc)
+        print(resp.text)
         wps.parseResponse(resp.xml)
         assert_response_accepted(resp)
 

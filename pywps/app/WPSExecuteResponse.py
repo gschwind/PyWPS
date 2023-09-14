@@ -211,6 +211,7 @@ class WPSExecuteResponse(object):
 
         if self.store_status_file:
             data["status_location"] = self.process.status_url
+            print(data["status_location"])
 
         if self.status == WPS_STATUS.ACCEPTED:
             self.message = 'PyWPS Process {} accepted'.format(self.process.identifier)

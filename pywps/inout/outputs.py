@@ -525,16 +525,8 @@ class MetaLink:
 
     def _load_template(self):
         from jinja2 import PackageLoader
-
-        # TODO: Use TEMPLATE_ENV directly
-        from pywps.response import RelEnvironment
-
-        template_env = RelEnvironment(
-            loader=PackageLoader('pywps', 'templates'),
-            trim_blocks=True, lstrip_blocks=True,
-            autoescape=True, )
-
-        self._template = template_env.get_template(self._xml_template)
+        from pywps.response.basic import TEMPLATE_ENV
+        self._template = TEMPLATE_ENV.get_template(self._xml_template)
 
 
 class MetaLink4(MetaLink):

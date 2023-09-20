@@ -172,17 +172,8 @@ class FileStorage(CachedStorage):
         return self.url(destination)
 
     def url(self, destination):
-        if isinstance(destination, IOHandler):
-            output_name, _ = _build_output_name(destination)
-            just_file_name = os.path.basename(output_name)
-            dst = f"{destination.uuid}/{just_file_name}"
-        else:
-            dst = destination
-
-        # make sure base url ends with '/'
-        baseurl = self.output_url.rstrip('/') + '/'
-        url = urljoin(baseurl, dst)
-        return url
+        base_url = config.get_config_value('server', 'url')
+        return f"{base_url}?service=WPS&request=file&uuid={self.uuid}"
 
     def location(self, destination):
         return os.path.join(self.target, destination)

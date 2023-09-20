@@ -19,7 +19,7 @@ from pywps.app.WPSExecuteRequest import WPSExecuteRequest
 from pywps.response import CapabilitiesResponse, DescribeResponse, ExecuteRawResponse, StatusResponse
 import pywps.configuration as config
 from pywps.app.WPSRequest import WPSRequest
-from pywps.dblog import log_request, store_status
+from pywps.dblog import log_request, store_status, get_file_storage_record
 from pywps.exceptions import (
     FileURLNotSupported,
     InvalidParameterValue,
@@ -29,6 +29,7 @@ from pywps.exceptions import (
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.response.status import WPS_STATUS
 from pywps.app.basic import get_response_type, get_default_response_mimetype
+
 
 LOGGER = logging.getLogger("PYWPS")
 
@@ -61,6 +62,24 @@ class Service(object):
         else:  # NullHandler | StreamHandler
             if not LOGGER.handlers:
                 LOGGER.addHandler(logging.NullHandler())
+
+    def get_file(self, http_request):
+        if http_request.method != "GET":
+            return Response("Method Not Allowed", status=405)
+        file_uuid = http_request.args.get('uuid', None)
+        if file_uuid is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        store = get_file_storage_record(file_uuid)
+        if store is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        if store.mimetype is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        return Response(open(store.path, "rb"),
+                        mimetype=store.mimetype,
+                        headers={
+                            'Content-Disposition': f'attachment; filename="{store.pretty_filename}"',
+                            'Content-Length': str(os.path.getsize(store.path))
+        })
 
     def get_status(self, http_request):
         try:
@@ -170,7 +189,14 @@ class Service(object):
                 LOGGER.debug('Setting PYWPS_CFG to {}'.format(environ_cfg))
                 os.environ['PYWPS_CFG'] = environ_cfg
 
-            if http_request.environ["PATH_INFO"] == "/status":
+            if http_request.environ["PATH_INFO"] == "/file":
+                try:
+                    return self.get_file(http_request)
+                except Exception as e:
+                    store_status(request_uuid, WPS_STATUS.FAILED,
+                                 'Request rejected due to exception', 100)
+                    raise e
+            elif http_request.environ["PATH_INFO"] == "/status":
                 try:
                     return self.get_status(http_request)
                 except Exception as e:

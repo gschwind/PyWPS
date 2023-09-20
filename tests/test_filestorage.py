@@ -50,8 +50,12 @@ class FileStorageTests(TestBase):
         output.data = "Hello World!"
         url = storage.write(output.data, 'foo.txt')
 
-        fname = Path(self.tmp_dir) / 'foo.txt'
-        self.assertEqual(url, file_uri(fname))
+        base_url = configuration.get_config_value('server', 'url')
+        url_ref = f"{base_url}/file?uuid={storage.uuid}"
+
+        self.assertEqual(url, url_ref)
+
+        fname = Path(storage.target) / 'foo.txt'
         with open(fname) as f:
             self.assertEqual(f.read(), "Hello World!")
 
@@ -64,13 +68,14 @@ class FileStorageTests(TestBase):
         output.uuid = '595129f0-1a6c-11ea-a30c-acde48001122'
         url = storage.url(output)
 
-        fname = Path(self.tmp_dir) / '595129f0-1a6c-11ea-a30c-acde48001122' / 'input.txt'
-        self.assertEqual(file_uri(fname), url)
+        base_url = configuration.get_config_value('server', 'url')
+        url_ref = f"{base_url}/file?uuid={storage.uuid}"
+
+        self.assertEqual(url_ref, url)
 
         file_name = 'test.txt'
         url = storage.url(file_name)
-        fname = Path(self.tmp_dir) / 'test.txt'
-        self.assertEqual(file_uri(fname), url)
+        self.assertEqual(url_ref, url)
 
     def test_location(self):
         configuration.CONFIG.set('server', 'outputpath', self.tmp_dir)

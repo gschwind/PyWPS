@@ -560,7 +560,7 @@ class ComplexOutputTest(TestBase):
         self.complex_out.url = wfsResource
         self.complex_out.storage = FileStorageBuilder().build()
         url = self.complex_out.get_url()
-        self.assertEqual('file', urlparse(url).scheme)
+        self.assertEqual('http', urlparse(url).scheme)
 
     def test_json(self):
         new_output = inout.outputs.ComplexOutput.from_json(self.complex_out.json)

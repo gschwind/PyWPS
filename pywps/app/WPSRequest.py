@@ -166,6 +166,15 @@ class WPSRequest(object):
 
         self.requested_status_uuid = _get_get_param(http_request, 'uuid')
 
+    def parse_get_file(self, http_request):
+        """Parse GET GetCapabilities request
+        """
+
+        # Required to store the request in database
+        self.set_version('1.0.0')
+
+        self.requested_file_uuid = _get_get_param(http_request, 'uuid')
+
     def parse_get_getcapabilities(self, http_request):
         """Parse GET GetCapabilities request."""
         acceptedversions = _get_get_param(http_request, 'acceptversions')
@@ -234,6 +243,8 @@ class WPSRequest(object):
             return self.parse_get_execute
         elif self.operation == 'status':
             return self.parse_get_status
+        elif self.operation == 'file':
+            return self.parse_get_file
         else:
             raise OperationNotSupported(
                 'Unknown request {}'.format(self.operation), operation)

@@ -6,10 +6,14 @@
 import logging
 import os
 from urllib.parse import urljoin
+import uuid
 
 from pywps import configuration as config
 from pywps.exceptions import FileStorageError, NotEnoughStorage
 from pywps.inout.basic import IOHandler
+import pywps.dblog as db
+
+from types import SimpleNamespace
 
 from . import STORE_TYPE, CachedStorage
 from .implementationbuilder import StorageImplementationBuilder
@@ -67,6 +71,7 @@ class FileStorage(CachedStorage):
         self.target = output_path
         self.output_url = output_url
         self.copy_function = copy_function
+        self.uuid = uuid.uuid1()
 
     def _do_store(self, output):
         """Copy output to final storage location.
@@ -123,6 +128,13 @@ class FileStorage(CachedStorage):
 
         url = self.url("{}/{}".format(request_uuid, just_file_name))
         LOGGER.info('File output URI: {}'.format(url))
+
+        db.update_file_storage_record(SimpleNamespace(
+            uuid=self.uuid,
+            pretty_filename=just_file_name,
+            mimetype=output.data_format.mime_type,
+            path=full_output_name
+        ))
 
         return STORE_TYPE.PATH, output_name, url
 

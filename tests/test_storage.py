@@ -8,6 +8,7 @@ import pytest
 from pywps.inout.storage.builder import StorageBuilder
 from pywps.inout.storage.file import FileStorage
 from pywps.inout.storage.s3 import S3Storage
+from pywps.inout.formats import get_format
 
 from pywps import configuration
 
@@ -24,6 +25,7 @@ class FakeOutput(object):
         fn.touch()
         self.file = str(fn.absolute())
         self.uuid = None
+        self.data_format = get_format("GEOTIFF")
 
 
 class TestDefaultStorageBuilder(TestBase):

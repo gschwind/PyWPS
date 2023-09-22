@@ -123,6 +123,10 @@ class ProcessInstance(Base):
     percent_done: Mapped[float] = mapped_column(nullable=True)
     status: Mapped[WPS_STATUS] = mapped_column(WPS_STATUS_TYPE, nullable=False, insert_default=WPS_STATUS.UNKNOWN)
 
+    def __repr__(self):
+        return f"<ProcessInstance id={self.uuid} pid={self.pid} operation={self.operation}" \
+               f"status={self.status.name} percent_done={self.percent_done}>"
+
 
 class RequestInstance(Base):
     __tablename__ = '{}stored_requests'.format(_tableprefix)

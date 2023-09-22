@@ -19,7 +19,7 @@ from multiprocessing import Lock
 
 import sqlalchemy
 from sqlalchemy import VARCHAR, Column, DateTime, Float, Integer, LargeBinary, String, Unicode
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, mapped_column, DeclarativeBase, Mapped
 from sqlalchemy.pool import NullPool, StaticPool
 
 from pywps import configuration
@@ -41,7 +41,10 @@ _SESSION_MAKER = None
 _tableprefix = configuration.get_config_value('logging', 'prefix')
 _schema = configuration.get_config_value('logging', 'schema')
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
+
 
 lock = Lock()
 
@@ -85,44 +88,44 @@ current_session = SessionManager()
 class ProcessInstance(Base):
     __tablename__ = '{}requests'.format(_tableprefix)
 
-    uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
-    pid = Column(Integer, nullable=False)
-    operation = Column(VARCHAR(30), nullable=False)
-    version = Column(VARCHAR(5), nullable=False)
-    time_start = Column(DateTime(), nullable=False)
-    time_end = Column(DateTime(), nullable=True)
-    identifier = Column(VARCHAR(255), nullable=True)
-    message = Column(String, nullable=True)
-    percent_done = Column(Float, nullable=True)
-    status = Column(Integer, nullable=True)
+    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
+    pid: Mapped[int] = mapped_column(nullable=False)
+    operation: Mapped[str] = mapped_column(VARCHAR(30), nullable=False)
+    version: Mapped[str] = mapped_column(VARCHAR(5), nullable=False)
+    time_start: Mapped[datetime.datetime] = mapped_column(nullable=False)
+    time_end: Mapped[datetime.datetime] = mapped_column(nullable=True)
+    identifier: Mapped[str] = mapped_column(VARCHAR(255), nullable=True)
+    message: Mapped[str] = mapped_column(nullable=True)
+    percent_done: Mapped[float] = mapped_column(nullable=True)
+    status: Mapped[int] = mapped_column(nullable=True)
 
 
 class RequestInstance(Base):
     __tablename__ = '{}stored_requests'.format(_tableprefix)
 
-    uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
-    request = Column(LargeBinary, nullable=False)
+    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
+    request: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 class FileStorageRecord(Base):
     __tablename__ = '{}file_storage_records'.format(_tableprefix)
 
-    uuid = Column(Unicode, primary_key=True, nullable=False)
-    pretty_filename = Column(Unicode, nullable=True)
-    mimetype = Column(Unicode, nullable=True)
-    timestamp = Column(DateTime, nullable=False)
-    path = Column(Unicode, nullable=False)
+    uuid: Mapped[str] = mapped_column(Unicode, primary_key=True, nullable=False)
+    pretty_filename: Mapped[str] = mapped_column(Unicode, nullable=True)
+    mimetype: Mapped[str] = mapped_column(Unicode, nullable=True)
+    timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
+    path: Mapped[str] = mapped_column(Unicode, nullable=False)
 
 
 class StatusRecord(Base):
     __tablename__ = '{}status_records'.format(_tableprefix)
 
     # Process uuid
-    uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
+    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
     # Time stamp for creation time
-    timestamp = Column(DateTime(), nullable=False)
+    timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
     # json data used in template
-    data = Column(LargeBinary, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 def log_request(uuid, request):

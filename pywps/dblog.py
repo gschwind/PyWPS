@@ -42,6 +42,30 @@ _tableprefix = configuration.get_config_value('logging', 'prefix')
 _schema = configuration.get_config_value('logging', 'schema')
 
 
+from sqlalchemy.types import TypeDecorator
+
+
+def TemplateIntEnum(cls: type):
+    """Create appropriate class to handle the enum.IntEnum by sqlalchemy"""
+    class TemapleMetaIntEnum(TypeDecorator):
+        """Convert Python IntEnum to Integer and the opposite"""
+
+        impl = Integer
+
+        cache_ok = True
+
+        def process_bind_param(self, value, dialect):
+            return value.value
+
+        def process_result_value(self, value, dialect):
+            return cls(value)
+
+    return TemapleMetaIntEnum
+
+
+WPS_STATUS_TYPE = TemplateIntEnum(WPS_STATUS)
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -97,7 +121,7 @@ class ProcessInstance(Base):
     identifier: Mapped[str] = mapped_column(VARCHAR(255), nullable=True)
     message: Mapped[str] = mapped_column(nullable=True)
     percent_done: Mapped[float] = mapped_column(nullable=True)
-    status: Mapped[int] = mapped_column(nullable=True)
+    status: Mapped[WPS_STATUS] = mapped_column(WPS_STATUS_TYPE, nullable=False, insert_default=WPS_STATUS.UNKNOWN)
 
 
 class RequestInstance(Base):

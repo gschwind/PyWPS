@@ -1,4 +1,11 @@
-from collections import namedtuple
+from enum import IntEnum
 
-_WPS_STATUS = namedtuple('WPSStatus', ['UNKNOWN', 'ACCEPTED', 'STARTED', 'PAUSED', 'SUCCEEDED', 'FAILED'])
-WPS_STATUS = _WPS_STATUS(0, 1, 2, 3, 4, 5)
+
+class WPS_STATUS(IntEnum):
+    UNKNOWN = 0
+    ACCEPTED = 1
+    STARTED = 2
+    PAUSED = 3
+    SUCCEEDED = 4
+    FAILED = 5
+

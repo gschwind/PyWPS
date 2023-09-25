@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from multiprocessing import Lock
 
 import sqlalchemy
-from sqlalchemy import VARCHAR, Column, DateTime, Float, Integer, LargeBinary, String
+from sqlalchemy import VARCHAR, Column, DateTime, Float, Integer, LargeBinary, String, Unicode
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
@@ -31,6 +31,8 @@ except ImportError:
     from sqlalchemy.ext.declarative import declarative_base
 
 from . import WPS_STATUS
+
+from types import SimpleNamespace as ns
 
 LOGGER = logging.getLogger('PYWPS')
 _SESSION_MAKER_DATABASE = None
@@ -100,6 +102,16 @@ class RequestInstance(Base):
 
     uuid = Column(VARCHAR(255), primary_key=True, nullable=False)
     request = Column(LargeBinary, nullable=False)
+
+
+class FileStorageRecord(Base):
+    __tablename__ = '{}file_storage_records'.format(_tableprefix)
+
+    uuid = Column(Unicode, primary_key=True, nullable=False)
+    pretty_filename = Column(Unicode, nullable=True)
+    mimetype = Column(Unicode, nullable=True)
+    timestamp = Column(DateTime, nullable=False)
+    path = Column(Unicode, nullable=False)
 
 
 class StatusRecord(Base):
@@ -178,6 +190,41 @@ def store_status(uuid, wps_status, message=None, status_percentage=None):
             request.percent_done = status_percentage
             request.status = wps_status
             session.commit()
+
+
+def update_file_storage_record(store_instance):
+    """Update or create a file store instance"""
+    with current_session as session:
+        r = session.query(FileStorageRecord).filter_by(uuid=str(store_instance.uuid))
+        if r.count() > 0:
+            store_instance_record = r.one()
+            store_instance_record.pretty_filename = store_instance.pretty_filename
+            store_instance_record.mimetype = store_instance.mimetype
+            store_instance_record.path = store_instance.path
+        else:
+            store_instance_record = FileStorageRecord(
+                uuid=str(store_instance.uuid),
+                timestamp=datetime.datetime.now(),
+                pretty_filename=store_instance.pretty_filename,
+                mimetype=store_instance.mimetype,
+                path=store_instance.path
+            )
+            session.add(store_instance_record)
+        session.commit()
+
+
+def get_file_storage_record(uuid):
+    """Get file store from uuid"""
+    with current_session as session:
+        r = session.query(FileStorageRecord).filter_by(uuid=str(uuid))
+        if r.count() < 1:
+            return None
+        store_instance_record = r.one()
+        # Copy store_instance_record content to unlink data from session
+        # TODO: get dynamic list of attributes
+        attrs = ["uuid", "timestamp", "pretty_filename", "mimetype", "path"]
+        store_instance_record = ns(**{k: getattr(store_instance_record, k) for k in attrs})
+        return store_instance_record
 
 
 # Update or create a store instance
@@ -343,6 +390,7 @@ def get_session():
         ProcessInstance.metadata.create_all(engine)
         RequestInstance.metadata.create_all(engine)
         StatusRecord.metadata.create_all(engine)
+        FileStorageRecord.metadata.create_all(engine)
 
         _SESSION_MAKER_DATABASE = database
         _SESSION_MAKER = Session

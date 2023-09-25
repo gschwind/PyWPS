@@ -19,7 +19,7 @@ from pywps.app.WPSExecuteRequest import WPSExecuteRequest
 from ..response import CapabilitiesResponse, DescribeResponse, ExecuteRawResponse, StatusResponse
 import pywps.configuration as config
 from pywps.app.WPSRequest import WPSRequest
-from pywps.dblog import log_request, store_status
+from pywps.dblog import log_request, store_status, get_file_storage_record
 from pywps.exceptions import (
     FileURLNotSupported,
     InvalidParameterValue,
@@ -29,6 +29,7 @@ from pywps.exceptions import (
 from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from .. import WPS_STATUS
 from pywps.app.basic import get_response_type, get_default_response_mimetype
+
 
 LOGGER = logging.getLogger("PYWPS")
 
@@ -74,6 +75,25 @@ class Service(object):
         else:  # NullHandler | StreamHandler
             if not LOGGER.handlers:
                 LOGGER.addHandler(logging.NullHandler())
+
+    @operations("file")
+    def get_file(self, wps_request, uuid):
+        if wps_request.http_request.method != "GET":
+            return Response("Method Not Allowed", status=405)
+        file_uuid = wps_request.http_request.args.get('uuid', None)
+        if file_uuid is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        store = get_file_storage_record(file_uuid)
+        if store is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        if store.mimetype is None:
+            raise NoApplicableCode("Invalid uuid for files request", code=500)
+        return Response(open(store.path, "rb"),
+                        mimetype=store.mimetype,
+                        headers={
+                            'Content-Disposition': f'attachment; filename="{store.pretty_filename}"',
+                            'Content-Length': str(os.path.getsize(store.path))
+        })
 
     @operations("status")
     def get_status(self, wps_request, uuid):

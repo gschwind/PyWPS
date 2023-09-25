@@ -69,7 +69,7 @@ BoundingBoxData
 Request and response objects
 ----------------------------
 
-.. autodata:: pywps.response.status.WPS_STATUS
+.. autodata:: pywps.WPS_STATUS
     :annotation:
 
     Process status information

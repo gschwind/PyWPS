@@ -108,7 +108,7 @@ class WPSRequestTest(TestBase):
 
         # dump to json and reload
         dump = self.request.json
-        self.request.json = json.loads(dump)
+        self.request.json = dump
 
         self.assertEqual(self.request.inputs['datetime'][0]['data'], '2017-04-20T12:00:00', 'Datatime set')
         self.assertEqual(self.request.inputs['date'][0]['data'], '2017-04-20', 'Data set')
@@ -148,7 +148,7 @@ class WPSRequestTest(TestBase):
 
         # dump to json and reload
         dump = self.request.json
-        self.request.json = json.loads(dump)
+        self.request.json = dump
 
         self.assertEqual(self.request.inputs['bbox'][0]['bbox'], '6.117602,46.176194,6.22283,46.275832', 'BBox data set')
         self.assertTrue(isinstance(self.request.inputs['bbox'][0]['crs'], str), 'CRS is a string')

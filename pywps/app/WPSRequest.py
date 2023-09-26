@@ -443,13 +443,17 @@ class WPSRequest(object):
     @property
     def json(self):
         """Return JSON encoded representation of the request."""
-        class ExtendedJSONEncoder(json.JSONEncoder):
-            def default(self, obj):
-                if isinstance(obj, datetime.date) or isinstance(obj, datetime.time):
-                    encoded_object = obj.isoformat()
-                else:
-                    encoded_object = json.JSONEncoder.default(self, obj)
-                return encoded_object
+        def date_to_isoformat(obj):
+            if isinstance(obj, dict):
+                return {k: date_to_isoformat(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return list(map(date_to_isoformat, obj))
+            elif isinstance(obj, tuple):
+                return tuple(map(date_to_isoformat, obj))
+            elif isinstance(obj, (datetime.time, datetime.date, datetime.datetime)):
+                return obj.isoformat()
+            else:
+                return obj
 
         obj = {
             'operation': self.operation,
@@ -467,7 +471,7 @@ class WPSRequest(object):
             'raw': self.raw
         }
 
-        return json.dumps(obj, allow_nan=False, cls=ExtendedJSONEncoder)
+        return date_to_isoformat(obj)
 
     @json.setter
     def json(self, value):

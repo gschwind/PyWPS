@@ -47,7 +47,7 @@ class Job(object):
             'wps_request': self.wps_request.json,
         }
 
-        return json.dumps(obj, allow_nan=False)
+        return obj
 
     @classmethod
     def from_json(cls, value):
@@ -57,7 +57,7 @@ class Job(object):
         """
         process = Process.from_json(value['process'])
         wps_request = WPSRequest()
-        wps_request.json = json.loads(value['wps_request'])
+        wps_request.json = value['wps_request']
         wps_response = WPSExecuteResponse(
             process,
             wps_request,
@@ -73,7 +73,7 @@ class Job(object):
         LOGGER.debug('dump job ...')
         filename = tempfile.mkstemp(prefix='job_', suffix='.dump', dir=self.workdir)[1]
         with open(filename, 'w') as fp:
-            fp.write(self.json)
+            json.dump(self.json, fp)
             LOGGER.debug("dumped job status to {}".format(filename))
             return filename
 

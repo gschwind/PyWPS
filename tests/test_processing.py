@@ -54,7 +54,7 @@ class GreeterProcessingTest(TestBase):
         self.assertTrue(isinstance(process, MultiProcessing))
 
     def test_job_json(self):
-        new_job = Job.from_json(json.loads(self.job.json))
+        new_job = Job.from_json(self.job.json)
         self.assertEqual(new_job.name, 'greeter')
         self.assertEqual(new_job.uuid, str(self.uuid))
         self.assertEqual(new_job.workdir, self.workdir)
@@ -89,7 +89,7 @@ class InOutProcessingTest(TestBase):
             wps_response=self.wps_response)
 
     def test_job_json(self):
-        new_job = Job.from_json(json.loads(self.job.json))
+        new_job = Job.from_json(self.job.json)
         self.assertEqual(new_job.name, 'inout')
         self.assertEqual(new_job.uuid, str(self.uuid))
         self.assertEqual(new_job.workdir, self.workdir)
@@ -143,7 +143,7 @@ class BBoxProcessingTest(TestBase):
             wps_response=self.wps_response)
 
     def test_job_json(self):
-        new_job = Job.from_json(json.loads(self.job.json))
+        new_job = Job.from_json(self.job.json)
         self.assertEqual(new_job.name, 'bbox_test')
         self.assertEqual(new_job.uuid, str(self.uuid))
         self.assertEqual(new_job.workdir, self.workdir)

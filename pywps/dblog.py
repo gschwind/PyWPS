@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from multiprocessing import Lock
 
 import sqlalchemy
-from sqlalchemy import VARCHAR, Column, DateTime, Float, Integer, LargeBinary, String, Unicode
+from sqlalchemy import Integer, LargeBinary, Unicode
 from sqlalchemy.orm import sessionmaker, mapped_column, DeclarativeBase, Mapped
 from sqlalchemy.pool import NullPool, StaticPool
 
@@ -66,7 +66,23 @@ def TemplateIntEnum(cls: type):
 WPS_STATUS_TYPE = TemplateIntEnum(WPS_STATUS)
 
 
+class JSON_BINARY(TypeDecorator):
+    impl = LargeBinary
+
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return json.dumps(value).encode("utf-8")
+
+    def process_result_value(self, value, dialect):
+        return json.loads(value.decode("utf-8"))
+
+
 class Base(DeclarativeBase):
+    type_annotation_map = {
+        str: Unicode,
+        WPS_STATUS: WPS_STATUS_TYPE
+    }
     pass
 
 
@@ -112,16 +128,16 @@ current_session = SessionManager()
 class ProcessInstance(Base):
     __tablename__ = '{}requests'.format(_tableprefix)
 
-    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
+    uuid: Mapped[str] = mapped_column(primary_key=True, nullable=False)
     pid: Mapped[int] = mapped_column(nullable=False)
-    operation: Mapped[str] = mapped_column(VARCHAR(30), nullable=False)
-    version: Mapped[str] = mapped_column(VARCHAR(5), nullable=False)
+    operation: Mapped[str] = mapped_column(nullable=False)
+    version: Mapped[str] = mapped_column(nullable=False)
     time_start: Mapped[datetime.datetime] = mapped_column(nullable=False)
     time_end: Mapped[datetime.datetime] = mapped_column(nullable=True)
-    identifier: Mapped[str] = mapped_column(VARCHAR(255), nullable=True)
+    identifier: Mapped[str] = mapped_column(nullable=True)
     message: Mapped[str] = mapped_column(nullable=True)
     percent_done: Mapped[float] = mapped_column(nullable=True)
-    status: Mapped[WPS_STATUS] = mapped_column(WPS_STATUS_TYPE, nullable=False, insert_default=WPS_STATUS.UNKNOWN)
+    status: Mapped[WPS_STATUS] = mapped_column(nullable=False, insert_default=WPS_STATUS.UNKNOWN)
 
     def __repr__(self):
         return f"<ProcessInstance id={self.uuid} pid={self.pid} operation={self.operation}" \
@@ -131,29 +147,29 @@ class ProcessInstance(Base):
 class RequestInstance(Base):
     __tablename__ = '{}stored_requests'.format(_tableprefix)
 
-    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
-    request: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    uuid: Mapped[str] = mapped_column(primary_key=True, nullable=False)
+    request: Mapped[bytes] = mapped_column(JSON_BINARY, nullable=False)
 
 
 class FileStorageRecord(Base):
     __tablename__ = '{}file_storage_records'.format(_tableprefix)
 
-    uuid: Mapped[str] = mapped_column(Unicode, primary_key=True, nullable=False)
-    pretty_filename: Mapped[str] = mapped_column(Unicode, nullable=True)
-    mimetype: Mapped[str] = mapped_column(Unicode, nullable=True)
+    uuid: Mapped[str] = mapped_column(primary_key=True, nullable=False)
+    pretty_filename: Mapped[str] = mapped_column(nullable=True)
+    mimetype: Mapped[str] = mapped_column(nullable=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
-    path: Mapped[str] = mapped_column(Unicode, nullable=False)
+    path: Mapped[str] = mapped_column(nullable=False)
 
 
 class StatusRecord(Base):
     __tablename__ = '{}status_records'.format(_tableprefix)
 
     # Process uuid
-    uuid: Mapped[str] = mapped_column(VARCHAR(255), primary_key=True, nullable=False)
+    uuid: Mapped[str] = mapped_column(primary_key=True, nullable=False)
     # Time stamp for creation time
     timestamp: Mapped[datetime.datetime] = mapped_column(nullable=False)
     # json data used in template
-    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    data: Mapped[bytes] = mapped_column(JSON_BINARY, nullable=False)
 
 
 def log_request(uuid, request):
@@ -265,12 +281,12 @@ def update_status_record(uuid, data):
         if r.count():
             status_record = r.one()
             status_record.timestamp = datetime.datetime.now()
-            status_record.data = json.dumps(data).encode("utf-8")
+            status_record.data = data
         else:
             status_record = StatusRecord(
                 uuid=str(uuid),
                 timestamp=datetime.datetime.now(),
-                data=json.dumps(data).encode("utf-8")
+                data=data
             )
             session.add(status_record)
         session.commit()
@@ -282,14 +298,14 @@ def force_failed_status(uuid):
         if r.count() < 1:
             return
         status_record = r.one()
-        data = json.loads(status_record.data.decode("utf-8"))
+        data = status_record.data
         data['status'] = {
             "status": "failed",
             "time": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime()),
             "message": "Process has crashed"
         }
         status_record.timestamp = datetime.datetime.now()
-        status_record.data = json.dumps(data).encode("utf-8")
+        status_record.data = data
         session.commit()
 
 
@@ -316,7 +332,7 @@ def get_status_record(uuid):
         # FIXME: There is a better solution ?
         attrs = ["uuid", "timestamp", "data"]
         status_record = SimpleNamespace(**{k: getattr(status_record, k) for k in attrs})
-        status_record.data = json.loads(status_record.data.decode("utf-8"))
+        status_record.data = status_record.data
         return status_record
 
 

@@ -17,8 +17,6 @@ import pywps
 
 __author__ = "Calin Ciociu"
 
-from pywps.util import file_uri
-
 RAW_OPTIONS = [('logging', 'format'), ]
 
 CONFIG = None
@@ -107,7 +105,6 @@ def load_hardcoded_configuration():
     CONFIG.set('server', 'maxrequestsize', '3mb')
     CONFIG.set('server', 'temp_path', tmpdir)
     CONFIG.set('server', 'processes_path', '')
-    CONFIG.set('server', 'outputurl', file_uri(tmpdir))
     CONFIG.set('server', 'allowedinputpaths', '')
     CONFIG.set('server', 'workdir', tmpdir)
     CONFIG.set('server', 'parallelprocesses', '2')

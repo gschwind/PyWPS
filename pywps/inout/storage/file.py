@@ -87,56 +87,45 @@ class FileStorage(CachedStorage):
         import tempfile
         import uuid
 
-        file_name = output.file
+        src_file_name = output.file
+        path, basename = os.path.split(src_file_name)
 
-        request_uuid = output.uuid or uuid.uuid1()
-
-        # Create a target folder for each request
-        target = os.path.join(self.target, str(request_uuid))
-        if not os.path.exists(target):
-            os.makedirs(target)
+        os.makedirs(self.target, exist_ok=True)
 
         # st.blksize is not available in windows, skips the validation on windows
         if platform.system() != 'Windows':
-            file_block_size = os.stat(file_name).st_blksize
+            file_block_size = os.stat(src_file_name).st_blksize
             # get_free_space delivers the numer of free blocks, not the available size!
             avail_size = get_free_space(self.target) * file_block_size
-            file_size = os.stat(file_name).st_size
+            file_size = os.stat(src_file_name).st_size
 
             # calculate space used according to block size
             actual_file_size = math.ceil(file_size / float(file_block_size)) * file_block_size
 
             if avail_size < actual_file_size:
-                raise NotEnoughStorage('Not enough space in {} to store {}'.format(self.target, file_name))
+                raise NotEnoughStorage('Not enough space in {} to store {}'.format(self.target, src_file_name))
 
         # build output name
-        output_name, suffix = _build_output_name(output)
-        # build tempfile in case of duplicates
-        if os.path.exists(os.path.join(target, output_name)):
-            output_name = tempfile.mkstemp(suffix=suffix, prefix=file_name + '_',
-                                           dir=target)[1]
+        _fd, full_output_name = tempfile.mkstemp(dir=self.target, prefix=f"{str(self.uuid)}_", suffix=f"_{basename}")
 
-        full_output_name = os.path.join(target, output_name)
         LOGGER.info(f'Storing file output to {full_output_name} ({self.copy_function}).')
         try:
-            self.copy(output.file, full_output_name, self.copy_function)
+            self.copy(src_file_name, full_output_name, self.copy_function)
         except Exception:
-            LOGGER.exception(f"Could not copy {output_name}.")
+            LOGGER.exception(f"Could not copy '{src_file_name}' to '{full_output_name}'.")
             raise FileStorageError("Could not copy output file.")
 
-        just_file_name = os.path.basename(output_name)
-
-        url = self.url("{}/{}".format(request_uuid, just_file_name))
+        url = self.url(full_output_name)
         LOGGER.info('File output URI: {}'.format(url))
 
         db.update_file_storage_record(SimpleNamespace(
             uuid=self.uuid,
-            pretty_filename=just_file_name,
+            pretty_filename=basename,
             mimetype=output.data_format.mime_type,
             path=full_output_name
         ))
 
-        return STORE_TYPE.PATH, output_name, url
+        return STORE_TYPE.PATH, basename, url
 
     @staticmethod
     def copy(src, dst, copy_function=None):

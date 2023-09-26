@@ -9,7 +9,6 @@ from pathlib import Path
 from pywps.inout.storage.file import FileStorageBuilder, FileStorage, _build_output_name
 from pywps.inout.storage import STORE_TYPE
 from pywps.inout.basic import ComplexOutput
-from pywps.util import file_uri
 
 from pywps import configuration, FORMATS
 
@@ -43,7 +42,6 @@ class FileStorageTests(TestBase):
             self.assertEqual(f.read(), "Hello World!")
 
     def test_write(self):
-        configuration.CONFIG.set('server', 'outputurl', file_uri(self.tmp_dir))
         storage = FileStorageBuilder().build()
         output = ComplexOutput('testme', 'Test', supported_formats=[FORMATS.TEXT], workdir=self.tmp_dir)
         output.data = "Hello World!"
@@ -59,7 +57,6 @@ class FileStorageTests(TestBase):
             self.assertEqual(f.read(), "Hello World!")
 
     def test_url(self):
-        configuration.CONFIG.set('server', 'outputurl', file_uri(self.tmp_dir))
         storage = FileStorageBuilder().build()
         output = ComplexOutput('testme', 'Test', supported_formats=[FORMATS.TEXT], workdir=self.tmp_dir)
         output.data = "Hello World!"

@@ -11,12 +11,6 @@ from urllib.parse import urlparse
 is_windows = platform.system() == 'Windows'
 
 
-def file_uri(path: Union[str, Path]) -> str:
-    path = Path(path)
-    path = path.as_uri()
-    return str(path)
-
-
 def uri_to_path(uri) -> str:
     p = urlparse(uri)
     path = p.path

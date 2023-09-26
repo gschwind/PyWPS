@@ -25,9 +25,8 @@ class FileStorageBuilder(StorageImplementationBuilder):
 
     def build(self):
         file_path = config.get_config_value('file-storage', 'path')
-        base_url = config.get_config_value('server', 'outputurl')
         copy_function = config.get_config_value('server', 'storage_copy_function')
-        return FileStorage(file_path, base_url, copy_function=copy_function)
+        return FileStorage(file_path, copy_function=copy_function)
 
 
 def _build_output_name(output):
@@ -64,12 +63,11 @@ class FileStorage(CachedStorage):
     True
     """
 
-    def __init__(self, output_path, output_url, copy_function=None):
+    def __init__(self, output_path, copy_function=None):
         """
         """
         CachedStorage.__init__(self)
         self.target = output_path
-        self.output_url = output_url
         self.copy_function = copy_function
         self.uuid = uuid.uuid1()
 

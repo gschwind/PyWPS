@@ -19,6 +19,7 @@ class FileStorageTests(TestBase):
     def setUp(self):
         super().setUp()
         self.tmp_dir = self.tmpdir.name
+        configuration.CONFIG.set('file-storage', 'path', self.tmp_dir)
 
     def test_build_output_name(self):
         storage = FileStorageBuilder().build()
@@ -30,7 +31,6 @@ class FileStorageTests(TestBase):
         self.assertEqual(suffix, '.txt')
 
     def test_store(self):
-        configuration.CONFIG.set('server', 'outputpath', self.tmp_dir)
         storage = FileStorageBuilder().build()
         output = ComplexOutput('testme', 'Test', supported_formats=[FORMATS.TEXT], workdir=self.tmp_dir)
         output.data = "Hello World!"
@@ -43,7 +43,6 @@ class FileStorageTests(TestBase):
             self.assertEqual(f.read(), "Hello World!")
 
     def test_write(self):
-        configuration.CONFIG.set('server', 'outputpath', self.tmp_dir)
         configuration.CONFIG.set('server', 'outputurl', file_uri(self.tmp_dir))
         storage = FileStorageBuilder().build()
         output = ComplexOutput('testme', 'Test', supported_formats=[FORMATS.TEXT], workdir=self.tmp_dir)
@@ -60,7 +59,6 @@ class FileStorageTests(TestBase):
             self.assertEqual(f.read(), "Hello World!")
 
     def test_url(self):
-        configuration.CONFIG.set('server', 'outputpath', self.tmp_dir)
         configuration.CONFIG.set('server', 'outputurl', file_uri(self.tmp_dir))
         storage = FileStorageBuilder().build()
         output = ComplexOutput('testme', 'Test', supported_formats=[FORMATS.TEXT], workdir=self.tmp_dir)
@@ -78,7 +76,6 @@ class FileStorageTests(TestBase):
         self.assertEqual(url_ref, url)
 
     def test_location(self):
-        configuration.CONFIG.set('server', 'outputpath', self.tmp_dir)
         storage = FileStorageBuilder().build()
         file_name = 'test.txt'
         loc = storage.location(file_name)

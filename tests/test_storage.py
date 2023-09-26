@@ -53,7 +53,7 @@ class TestFileStorageBuilder(TestBase):
         super().setUp()
         configuration.CONFIG.set('server', 'storagetype', 'file')
         self.opath = os.path.join(self.tmpdir.name, "a", "b", "c")
-        configuration.CONFIG.set('server', 'outputpath', self.opath)
+        configuration.CONFIG.set('file-storage', 'path', self.opath)
 
     def test_recursive_directory_creation(self):
         """Test that outputpath is created."""

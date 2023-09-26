@@ -24,7 +24,7 @@ LOGGER = logging.getLogger('PYWPS')
 class FileStorageBuilder(StorageImplementationBuilder):
 
     def build(self):
-        file_path = config.get_config_value('server', 'outputpath')
+        file_path = config.get_config_value('file-storage', 'path')
         base_url = config.get_config_value('server', 'outputurl')
         copy_function = config.get_config_value('server', 'storage_copy_function')
         return FileStorage(file_path, base_url, copy_function=copy_function)

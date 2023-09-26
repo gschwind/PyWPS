@@ -9,6 +9,7 @@ from pywps.inout.storage.builder import StorageBuilder
 from pywps.inout.storage.file import FileStorage
 from pywps.inout.storage.s3 import S3Storage
 from pywps.inout.formats import get_format
+from pywps.dblog import get_file_storage_record
 
 from pywps import configuration
 
@@ -60,3 +61,6 @@ class TestFileStorageBuilder(TestBase):
         fn = FakeOutput(self.tmpdir.name)
         storage.store(fn)
         assert os.path.exists(self.opath)
+        r = get_file_storage_record(storage.uuid)
+        assert r is not None
+        assert os.path.exists(r.path)

@@ -108,7 +108,6 @@ def load_hardcoded_configuration():
     CONFIG.set('server', 'temp_path', tmpdir)
     CONFIG.set('server', 'processes_path', '')
     CONFIG.set('server', 'outputurl', file_uri(tmpdir))
-    CONFIG.set('server', 'outputpath', tmpdir)
     CONFIG.set('server', 'allowedinputpaths', '')
     CONFIG.set('server', 'workdir', tmpdir)
     CONFIG.set('server', 'parallelprocesses', '2')
@@ -167,6 +166,8 @@ def load_hardcoded_configuration():
     CONFIG.set('s3', 'encrypt', 'false')
     CONFIG.set('s3', 'region', '')
 
+    CONFIG.add_section('file-storage')
+    CONFIG.set('file-storage', 'path', tmpdir)
 
 def load_configuration(cfgfiles=None):
     """Load PyWPS configuration from configuration files.

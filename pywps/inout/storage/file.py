@@ -92,19 +92,6 @@ class FileStorage(CachedStorage):
 
         os.makedirs(self.target, exist_ok=True)
 
-        # st.blksize is not available in windows, skips the validation on windows
-        if platform.system() != 'Windows':
-            file_block_size = os.stat(src_file_name).st_blksize
-            # get_free_space delivers the numer of free blocks, not the available size!
-            avail_size = get_free_space(self.target) * file_block_size
-            file_size = os.stat(src_file_name).st_size
-
-            # calculate space used according to block size
-            actual_file_size = math.ceil(file_size / float(file_block_size)) * file_block_size
-
-            if avail_size < actual_file_size:
-                raise NotEnoughStorage('Not enough space in {} to store {}'.format(self.target, src_file_name))
-
         # build output name
         _fd, full_output_name = tempfile.mkstemp(dir=self.target, prefix=f"{str(self.uuid)}_", suffix=f"_{basename}")
 
@@ -166,20 +153,3 @@ class FileStorage(CachedStorage):
 
     def location(self, destination):
         return os.path.join(self.target, destination)
-
-
-def get_free_space(folder):
-    """Return folder/drive free space (in bytes)."""
-    import platform
-
-    if platform.system() == 'Windows':
-        import ctypes
-
-        free_bytes = ctypes.c_ulonglong(0)
-        ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(folder), None, None, ctypes.pointer(free_bytes))
-        free_space = free_bytes.value
-    else:
-        free_space = os.statvfs(folder).f_bfree
-
-    LOGGER.debug('Free space: {}'.format(free_space))
-    return free_space

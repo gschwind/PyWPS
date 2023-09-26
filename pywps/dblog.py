@@ -412,24 +412,20 @@ def get_session():
         return _SESSION_MAKER()
 
     with lock:
-        echo = True
-        level = configuration.get_config_value('logging', 'level')
-        level_name = logging.getLevelName(level)
-        if isinstance(level_name, int) and level_name >= logging.INFO:
-            echo = False
+        database_logging = configuration.get_config_value('logging', 'database_logging') == 'true'
         try:
             if ":memory:" in database:
                 engine = sqlalchemy.create_engine(database,
-                                                  echo=echo,
+                                                  echo=database_logging,
                                                   connect_args={'check_same_thread': False},
                                                   poolclass=StaticPool)
             elif database.startswith("sqlite"):
                 engine = sqlalchemy.create_engine(database,
-                                                  echo=echo,
+                                                  echo=database_logging,
                                                   connect_args={'check_same_thread': False},
                                                   poolclass=NullPool)
             else:
-                engine = sqlalchemy.create_engine(database, echo=echo, poolclass=NullPool)
+                engine = sqlalchemy.create_engine(database, echo=database_logging, poolclass=NullPool)
         except sqlalchemy.exc.SQLAlchemyError as e:
             raise NoApplicableCode("Could not connect to database: {}".format(e.message))
 

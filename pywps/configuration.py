@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import tempfile
+import re
 
 import pywps
 
@@ -266,24 +267,22 @@ def _get_default_config_files_location():
 
 
 def get_size_mb(mbsize):
-    """Get real size of given object in Mb.
+    """Convert string with units in its value in megabytes"""
 
-    """
+    units = {
+        "g": 1024**3,
+        "m": 1024**2,
+        "k": 1024**1,
+        "gb": 1024 ** 3,
+        "mb": 1024 ** 2,
+        "kb": 1024 ** 1,
+        "b": 1
+    }
 
-    size = mbsize.lower()
-
-    import re
-
-    units = re.compile("[gmkb].*")
-    newsize = float(re.sub(units, '', size))
-
-    if size.find("g") > -1:
-        newsize *= 1024
-    elif size.find("m") > -1:
-        newsize *= 1
-    elif size.find("k") > -1:
-        newsize /= 1024
-    else:
-        newsize *= 1
-    LOGGER.debug('Calculated real size of {} is {}'.format(mbsize, newsize))
-    return newsize
+    punits = re.compile("^([0-9eE+.-]+)(" + "|".join(list(units)) + ")?$")
+    m = punits.match(mbsize.lower())
+    if m is None:
+        raise Exception(f"Invalid configuration size '{mbsize}")
+    size = float(m.group(1)) * units.get(m.group(2), 1) / units["m"]
+    LOGGER.debug('Calculated real size of {} is {}'.format(mbsize, size))
+    return size

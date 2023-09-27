@@ -13,6 +13,8 @@ from pywps.exceptions import FileStorageError, NotEnoughStorage
 from pywps.inout.basic import IOHandler
 import pywps.dblog as db
 
+from pywps.util import trim_directory_if_needed
+
 from types import SimpleNamespace
 
 from . import STORE_TYPE, CachedStorage
@@ -89,6 +91,13 @@ class FileStorage(CachedStorage):
         path, basename = os.path.split(src_file_name)
 
         os.makedirs(self.target, exist_ok=True)
+
+        sz = os.path.getsize(src_file_name)
+
+        min_size = config.get_size_value('file-storage', 'min_stored_size')
+        max_size = config.get_size_value('file-storage', 'max_stored_size')
+
+        trim_directory_if_needed(self.target, min_size * 1024 * 1024, max_size * 1024 * 1024, sz)
 
         # build output name
         _fd, full_output_name = tempfile.mkstemp(dir=self.target, prefix=f"{str(self.uuid)}_", suffix=f"_{basename}")

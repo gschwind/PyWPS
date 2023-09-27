@@ -207,6 +207,9 @@ def load_hardcoded_configuration():
 
     CONFIG.add_section('file-storage')
     CONFIG.set('file-storage', 'path', tmpdir)
+    CONFIG.set('file-storage', 'max_stored_size', '1GB')
+    CONFIG.set('file-storage', 'min_stored_size', '500MB')
+
 
 def load_configuration(cfgfiles=None):
     """Load PyWPS configuration from configuration files.

@@ -20,7 +20,17 @@ __author__ = "Calin Ciociu"
 
 RAW_OPTIONS = [('logging', 'format'), ]
 
-CONFIG = None
+
+class LazyConfigLoader:
+    """Automaticaly load the default configuration on any attribute access"""
+    def __getattr__(self, item):
+        global CONFIG
+        load_configuration()
+        return getattr(CONFIG, item)
+
+
+CONFIG = LazyConfigLoader()
+
 LOGGER = logging.getLogger("PYWPS")
 
 wps_strict = True
@@ -68,8 +78,7 @@ def get_config_value(section, option, default_value=''):
     :returns: value found in the configuration file
     """
 
-    if not CONFIG:
-        load_configuration()
+    global CONFIG
 
     value = default_value
 

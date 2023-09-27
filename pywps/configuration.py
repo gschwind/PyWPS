@@ -96,6 +96,31 @@ def get_config_value(section, option, default_value=''):
     return value
 
 
+def get_str_value(section, option, default_value=None):
+    global CONFIG
+    return CONFIG.get(section, option, fallback=default_value)
+
+
+def get_raw_value(section, option, default_value=None):
+    global CONFIG
+    return CONFIG.get(section, option, raw=True, fallback=default_value)
+
+
+def get_bool_value(section, option, default_value=None):
+    global CONFIG
+    return CONFIG.getboolean(section, option, fallback=default_value)
+
+
+def get_int_value(section, option, default_value=None):
+    global CONFIG
+    return CONFIG.getint(section, option, fallback=default_value)
+
+
+def get_float_value(section, option, default_value=None):
+    global CONFIG
+    return CONFIG.getfloat(section, option, fallback=default_value)
+
+
 def load_hardcoded_configuration():
     """Load PyWPS hardcoded configuration."""
 

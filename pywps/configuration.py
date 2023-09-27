@@ -121,6 +121,14 @@ def get_float_value(section, option, default_value=None):
     return CONFIG.getfloat(section, option, fallback=default_value)
 
 
+def get_size_value(section, option, default_value=None):
+    global CONFIG
+    size_string = CONFIG.get(section, option, fallback=None)
+    if size_string is None:
+        return default_value
+    return get_size_mb(size_string)
+
+
 def load_hardcoded_configuration():
     """Load PyWPS hardcoded configuration."""
 

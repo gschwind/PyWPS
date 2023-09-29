@@ -125,10 +125,10 @@ class Service(object):
         :param uuid: string identifier of the request
         """
         self._set_grass()
-        process = self.prepare_process_for_execution(wps_request.identifier)
+        process = self.prepare_process_for_execution(wps_request.identifier, uuid)
         return self._parse_and_execute(process, wps_request, uuid)
 
-    def prepare_process_for_execution(self, identifier):
+    def prepare_process_for_execution(self, identifier, uuid):
         """Prepare the process identified by ``identifier`` for execution.
         """
         try:
@@ -141,7 +141,7 @@ class Service(object):
         process = copy.deepcopy(process)
         process.service = self
         workdir = os.path.abspath(config.get_config_value('server', 'workdir'))
-        tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
+        tempdir = tempfile.mkdtemp(prefix=f'pywps_process_{uuid}_', dir=workdir)
         process.set_workdir(tempdir)
         return process
 

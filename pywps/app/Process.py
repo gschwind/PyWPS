@@ -236,7 +236,7 @@ class Process(object):
         try:
             self._set_grass(wps_request)
             # if required set HOME to the current working directory.
-            if config.get_config_value('server', 'sethomedir') is True:
+            if config.get_bool_value('server', 'sethomedir'):
                 os.environ['HOME'] = self.workdir
                 LOGGER.info('Setting HOME to current working directory: {}'.format(os.environ['HOME']))
             LOGGER.debug('ProcessID={}, HOME={}'.format(self.uuid, os.environ.get('HOME')))

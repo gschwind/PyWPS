@@ -322,7 +322,7 @@ class Process(object):
             new_wps_request = WPSRequest()
             new_wps_request.json = json.loads(request_json)
             process_identifier = new_wps_request.identifier
-            process = self.service.prepare_process_for_execution(process_identifier)
+            process = self.service.prepare_process_for_execution(process_identifier, uuid)
             new_wps_request = WPSExecuteRequest(process, new_wps_request)
             process._set_uuid(uuid)
             process._setup_status_storage()

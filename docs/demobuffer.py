@@ -29,7 +29,7 @@ from pywps import Process, LiteralInput, ComplexOutput, ComplexInput, Format
 from pywps.app.Common import Metadata
 from pywps.validator.mode import MODE
 from pywps.inout.formats import FORMATS
-from pywps.response.status import WPS_STATUS
+from pywps import WPS_STATUS
 
 inpt_vector = ComplexInput(
     'vector',
